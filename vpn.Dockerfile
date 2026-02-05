@@ -5,7 +5,7 @@ RUN echo "https://mirror.arvancloud.ir/alpine/v3.23/main" > /etc/apk/repositorie
     apk update && \
     apk add --no-cache openvpn iptables curl iproute2
 
-COPY vpn-startup.sh /usr/local/bin/startup.sh
+COPY vpn-advanced.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh
 
 CMD ["/usr/local/bin/startup.sh"]
