@@ -1,10 +1,12 @@
 #!/bin/sh
 set -e
 
-VPN_CONFIG=${VPN_CONFIG:-config.ovpn}
+VPN_CONFIG=${VPN_CONFIG:-/vpn/config.ovpn}
+RUNTIME_CONFIG="/tmp/config-runtime.ovpn"
+
+CREDENTIALS=${CREDENTIALS:-true}
 AUTH_FILE=${AUTH_FILE:-/shared/auth.txt}
 LOG_FILE=${LOG_FILE:-/logs/$(hostname).log}
-RUNTIME_CONFIG="/tmp/config-runtime.ovpn"
 
 log() { echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"; }
 error() {
@@ -12,16 +14,23 @@ error() {
 	exit 1
 }
 
+# Validations
 cd /vpn || error "VPN config directory not found"
 [ -f "$VPN_CONFIG" ] || error "$VPN_CONFIG not found"
-[ -f "$AUTH_FILE" ] || error "$AUTH_FILE not found"
+
+if [ "$CREDENTIALS" = "true" ]; then
+	[ -f "$AUTH_FILE" ] || error "$AUTH_FILE not found"
+
+	if [ $(wc -l <"$AUTH_FILE") -lt 1 ]; then
+		error "Invalid auth.txt format. Expected 2 lines (username and password)"
+	fi
+fi
 
 log "Preparing configuration..."
 cat "$VPN_CONFIG" >"$RUNTIME_CONFIG"
 cat >>"$RUNTIME_CONFIG" <<EOF
 
 # Auto-reconnect directives
-keepalive 10 60
 ping-restart 120
 persist-key
 persist-tun
@@ -30,12 +39,21 @@ connect-retry 5
 connect-retry-max 999999
 EOF
 
+cat $RUNTIME_CONFIG
+
 log "Starting OpenVPN..."
-openvpn --config "$VPN_CONFIG" \
-	--auth-user-pass "$AUTH_FILE" \
-	--log "$LOG_FILE" \
-	--verb 3 \
-	--daemon
+if [ "$CREDENTIALS" = "true" ]; then
+	openvpn --config "$RUNTIME_CONFIG" \
+		--auth-user-pass "$AUTH_FILE" \
+		--log "$LOG_FILE" \
+		--verb 3 \
+		--daemon
+else
+	openvpn --config "$RUNTIME_CONFIG" \
+		--log "$LOG_FILE" \
+		--verb 3 \
+		--daemon
+fi
 
 log "Waiting for VPN tunnel..."
 for i in $(seq 1 40); do
