@@ -1,0 +1,84 @@
+services:
+  vpn1:
+    build:
+      context: .
+      dockerfile: vpn.Dockerfile
+    image: vpn-client:latest
+    container_name: vpn1
+    hostname: vpn1
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    networks:
+      - vpn1-net
+    volumes:
+      - ./configs/vpn1:/vpn:ro
+      - ./shared:/shared:ro
+      - ./logs:/logs
+    environment:
+      - TZ=Asia/Tehran
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    dns:
+      - 8.8.8.8
+
+  vpn2:
+    image: vpn-client:latest
+    container_name: vpn2
+    hostname: vpn2
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    networks:
+      - vpn2-net
+    volumes:
+      - ./configs/vpn2:/vpn:ro
+      - ./shared:/shared:ro
+      - ./logs:/logs
+    environment:
+      - TZ=Asia/Tehran
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    dns:
+      - 8.8.8.8
+
+  gost:
+    build:
+      context: .
+      dockerfile: gost.Dockerfile
+    image: gost-proxy:latest
+    container_name: gost-proxy
+    hostname: gost-proxy
+    restart: unless-stopped
+    depends_on:
+      - vpn1
+      - vpn2
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - vpn1-net
+      - vpn2-net
+    ports:
+      - "1080:1080"
+      - "1081:1081"
+    environment:
+      - TZ=Asia/Tehran
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+networks:
+  vpn1-net:
+    driver: bridge
+
+  vpn2-net:
+    driver: bridge
