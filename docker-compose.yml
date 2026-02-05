@@ -48,6 +48,29 @@ services:
     dns:
       - 8.8.8.8
 
+  vpn3:
+    image: vpn-client:latest
+    container_name: vpn3
+    hostname: vpn3
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    networks:
+      - vpn3-net
+    volumes:
+      - ./configs/vpn3:/vpn:ro
+      - ./shared:/shared:ro
+      - ./logs:/logs
+    environment:
+      - TZ=Asia/Tehran
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    dns:
+      - 8.8.8.8
+
   gost:
     build:
       context: .
@@ -59,14 +82,15 @@ services:
     depends_on:
       - vpn1
       - vpn2
+      - vpn3
     cap_add:
       - NET_ADMIN
     networks:
       - vpn1-net
       - vpn2-net
+      - vpn3-net
     ports:
-      - "1080:1080"
-      - "1081:1081"
+      - "1080-1100:1080-1100"
     environment:
       - TZ=Asia/Tehran
     sysctls:
@@ -81,4 +105,7 @@ networks:
     driver: bridge
 
   vpn2-net:
+    driver: bridge
+
+  vpn3-net:
     driver: bridge
