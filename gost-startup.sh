@@ -12,6 +12,11 @@ MAX_PORT=1100
 BASE_TABLE=100
 BASE_MARK=1
 
+# Web API settings
+WEBAPI_PORT=${WEBAPI_PORT:-18080}
+WEBAPI_USER=${WEBAPI_USER:-"admin"}
+WEBAPI_PASS=${WEBAPI_PASS:-"gost"}
+
 log "Starting Dynamic Gost Proxy Manager..."
 log "Waiting for VPN containers..."
 sleep 15
@@ -67,13 +72,16 @@ done
 log "================================"
 log "Starting Gost with $VPN_COUNT proxy(ies)..."
 
-eval "gost $GOST_ARGS" &
+eval "gost $GOST_ARGS -api=${WEBAPI_USER}:${WEBAPI_PASS}@:${WEBAPI_PORT}" &
 
 sleep 3
 
 log "================================"
 log "✓ Dynamic Proxy Manager Ready"
 log "================================"
+log "Web API: http://0.0.0.0:$WEBAPI_PORT"
+log "Username: $WEBAPI_USER"
+log "Password: $WEBAPI_PASS"
 
 PORT=$BASE_PORT
 for vpn_entry in $VPN_CONTAINERS; do
