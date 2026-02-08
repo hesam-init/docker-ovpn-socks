@@ -14,9 +14,9 @@ services:
     networks:
       - vpn1-net
     volumes:
-      - ./configs/vpn1:/vpn:ro
-      - ./shared:/shared:ro
-      - ./logs:/logs
+      - ./configs/vpn1:/vpn:ro,z
+      - ./shared:/shared:ro,z
+      - ./logs:/logs,z
     environment:
       - TZ=Asia/Tehran
       # - CREDENTIALS=true
@@ -38,9 +38,9 @@ services:
     networks:
       - vpn2-net
     volumes:
-      - ./configs/vpn2:/vpn:ro
-      - ./shared:/shared:ro
-      - ./logs:/logs
+      - ./configs/vpn2:/vpn:ro,z
+      - ./shared:/shared:ro,z
+      - ./logs:/logs,z
     environment:
       - TZ=Asia/Tehran
       # - CREDENTIALS=true
@@ -62,9 +62,9 @@ services:
     networks:
       - vpn3-net
     volumes:
-      - ./configs/vpn3:/vpn:ro
-      - ./shared:/shared:ro
-      - ./logs:/logs
+      - ./configs/vpn3:/vpn:ro,z
+      - ./shared:/shared:ro,z
+      - ./logs:/logs,z
     environment:
       - TZ=Asia/Tehran
       # - CREDENTIALS=true
