@@ -36,6 +36,9 @@ iptables -A FORWARD -i eth0 -o tun0 -j ACCEPT
 iptables -A FORWARD -i tun0 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT
 
 echo "[$(date +'%Y-%m-%d %H:%M:%S')] NAT routing configured" >&2
+
+gost -L dns://:53/1.1.1.1,tls://1.1.1.1:853?mode=udp &
+echo "[$(date +'%Y-%m-%d %H:%M:%S')] DNS proxy started" >&2
 SCRIPT
 
 chmod +x /tmp/setup-nat.sh
