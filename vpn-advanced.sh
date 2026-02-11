@@ -37,7 +37,7 @@ iptables -A FORWARD -i tun0 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCE
 
 echo "[$(date +'%Y-%m-%d %H:%M:%S')] NAT routing configured" >&2
 
-gost -L dns://:53/1.1.1.1,tls://1.1.1.1:853?mode=udp &
+gost -L dns://:53/1.1.1.1?mode=udp -L dns://:54/1.1.1.1?mode=tcp &
 echo "[$(date +'%Y-%m-%d %H:%M:%S')] DNS proxy started" >&2
 SCRIPT
 

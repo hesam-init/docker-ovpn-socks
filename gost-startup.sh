@@ -62,17 +62,17 @@ for vpn_entry in $VPN_CONTAINERS; do
 	ip rule add fwmark $MARK table $TABLE 2>/dev/null || true
 
 	# Build Gost arguments
-	GOST_ARGS="$GOST_ARGS -L=socks5://0.0.0.0:${PORT}?so_mark=${MARK}"
-
+	GOST_ARGS="$GOST_ARGS -L=socks5://0.0.0.0:${PORT}?so_mark=${MARK}&resolver=tcp://${VPN_IP}:54"
+	
 	PORT=$((PORT + 1))
 	TABLE=$((TABLE + 1))
 	MARK=$((MARK + 1))
 done
 
 log "================================"
-log "Starting Gost with $VPN_COUNT proxy(ies)..."
+log "Starting Gost with $VPN_COUNT proxies..."
 
-eval "gost $GOST_ARGS -api=${WEBAPI_USER}:${WEBAPI_PASS}@:${WEBAPI_PORT}" &
+gost $GOST_ARGS -api=${WEBAPI_USER}:${WEBAPI_PASS}@:${WEBAPI_PORT} &
 
 sleep 3
 
