@@ -12,7 +12,8 @@ MAX_PORT=1100
 BASE_TABLE=100
 BASE_MARK=1
 
-# Web API settings
+# GOST settings
+GOST_QUIET=${GOST_QUIET:-true}
 WEBAPI_PORT=${WEBAPI_PORT:-18080}
 WEBAPI_USER=${WEBAPI_USER:-"admin"}
 WEBAPI_PASS=${WEBAPI_PASS:-"gost"}
@@ -63,7 +64,7 @@ for vpn_entry in $VPN_CONTAINERS; do
 
 	# Build Gost arguments
 	GOST_ARGS="$GOST_ARGS -L=socks5://0.0.0.0:${PORT}?so_mark=${MARK}&resolver=tcp://${VPN_IP}:54"
-	
+
 	PORT=$((PORT + 1))
 	TABLE=$((TABLE + 1))
 	MARK=$((MARK + 1))
@@ -72,7 +73,11 @@ done
 log "================================"
 log "Starting Gost with $VPN_COUNT proxies..."
 
-gost $GOST_ARGS -api=${WEBAPI_USER}:${WEBAPI_PASS}@:${WEBAPI_PORT} &
+if [ "$GOST_QUIET" = "true" ]; then
+	gost $GOST_ARGS -api=${WEBAPI_USER}:${WEBAPI_PASS}@:${WEBAPI_PORT} >/dev/null 2>&1 &
+else
+	gost $GOST_ARGS -api=${WEBAPI_USER}:${WEBAPI_PASS}@:${WEBAPI_PORT} &
+fi
 
 sleep 3
 

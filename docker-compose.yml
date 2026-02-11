@@ -102,6 +102,7 @@ services:
       - WEBAPI_PORT=18080
       - WEBAPI_USER=admin
       - WEBAPI_PASS=gost
+      # - GOST_QUIET=false
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     ulimits:
