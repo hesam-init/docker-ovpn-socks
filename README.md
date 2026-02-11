@@ -4,21 +4,19 @@ A lightweight, containerized solution for running multiple VPN connections with 
 
 ## Features
 
-- 🚀 **Single Proxy Manager**: One Gost container handles all SOCKS5 proxies
-- 🔀 **Multiple VPN Support**: Route different traffic through different VPN servers
-- 🎯 **Port-based Routing**: Each SOCKS5 port routes through a specific VPN
-- 🐳 **Pure Docker**: No host network configuration needed
-- 🔧 **Policy-based Routing**: Uses Linux fwmark and ip rules for traffic separation
-- 📦 **Alpine Linux**: Minimal image size and resource usage
-- ♻️ **Easy to Scale**: Add more VPN connections by duplicating service blocks
+- **Single Proxy Manager**: One Gost container handles all SOCKS5 proxies
+- **Multiple VPN Support**: Route different traffic through different VPN servers
+- **Port-based Routing**: Each SOCKS5 port routes through a specific VPN
+- **Pure Docker**: No host network configuration needed
+- **Policy-based Routing**: Uses Linux fwmark and ip rules for traffic separation
+- **Alpine Linux**: Minimal image size and resource usage
+- **Easy to Scale**: Add more VPN connections by duplicating service blocks
 
 ## Architecture
 
 ```
-
 Client → SOCKS5 Port 1080 → Gost Container → VPN1 Container → Internet (IP1)
 Client → SOCKS5 Port 1081 → Gost Container → VPN2 Container → Internet (IP2)
-
 ```
 
 ### Components
@@ -91,18 +89,17 @@ curl --proxy socks5h://127.0.0.1:1081 ifconfig.me
 
 ```
 docker-vpn-socks/
-├── vpn.Dockerfile          # VPN container image
-├── gost.Dockerfile         # Gost proxy image
+├── Dockerfile              # Dockerfile
 ├── docker-compose.yml      # Service definitions
 ├── vpn-startup.sh          # VPN initialization script
 ├── gost-startup.sh         # Gost routing configuration
 ├── shared/
-│   └── auth.txt           # VPN credentials (create this)
+│   └── auth.txt            # VPN credentials (create this)
 ├── configs/
 │   ├── vpn1/
-│   │   └── config.ovpn    # VPN1 OpenVPN config (add yours)
+│   │   └── config.ovpn     # VPN1 OpenVPN config (add yours)
 │   └── vpn2/
-│       └── config.ovpn    # VPN2 OpenVPN config (add yours)
+│       └── config.ovpn     # VPN2 OpenVPN config (add yours)
 └── logs/                   # OpenVPN logs
 ```
 
