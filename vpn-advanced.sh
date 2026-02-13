@@ -54,7 +54,9 @@ persist-key
 persist-tun
 resolv-retry infinite
 connect-retry 5
-connect-retry-max 999999
+connect-retry-max 999
+
+mute-replay-warnings
 
 script-security 2
 up /tmp/setup-nat.sh
