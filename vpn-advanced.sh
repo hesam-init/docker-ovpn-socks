@@ -30,26 +30,27 @@ fi
 cat >/tmp/setup-nat.sh <<'SCRIPT'
 #!/bin/sh
 
-FLAG_FILE="/tmp/nat-setup-done"
-
-if [ -f "$FLAG_FILE" ]; then
-   echo "[$(date +'%Y-%m-%d %H:%M:%S')] NAT already configured, skipping" >&2
-   exit 0
-fi
+echo "[$(date +'%Y-%m-%d %H:%M:%S')] Setting up NAT routing..." >&2
 
 sleep 5
 
-iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
+# Flush existing rules to ensure clean state
+iptables -t nat -F POSTROUTING 2>/dev/null || true
+iptables -F FORWARD 2>/dev/null || true
 
+iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
 iptables -A FORWARD -i eth+ -o tun0 -j ACCEPT
 iptables -A FORWARD -i tun0 -o eth+ -m state --state RELATED,ESTABLISHED -j ACCEPT
 
 echo "[$(date +'%Y-%m-%d %H:%M:%S')] NAT routing configured" >&2
 
-gost -L dns://:53/1.1.1.1?mode=udp -L dns://:54/1.1.1.1?mode=tcp &
-echo "[$(date +'%Y-%m-%d %H:%M:%S')] DNS proxy started" >&2
+# Kill any existing gost processes
+pkill -f "gost.*dns" 2>/dev/null || true
+sleep 1
 
-touch "$FLAG_FILE"
+# Start DNS proxy
+gost -L dns://:53/1.1.1.1?mode=udp -L dns://:54/1.1.1.1?mode=tcp &
+echo "[$(date +'%Y-%m-%d %H:%M:%S')] DNS proxy started (PID: $!)" >&2
 SCRIPT
 
 chmod +x /tmp/setup-nat.sh
