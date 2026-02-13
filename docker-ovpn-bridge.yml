@@ -1,0 +1,130 @@
+services:
+  vpn1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: vpn
+    image: vpn-client:latest
+    container_name: vpn1
+    hostname: vpn1
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    networks:
+      - vpn1-net
+      - dockervlan
+    volumes:
+      - ./configs/vpn1:/vpn:ro,z
+      - ./shared:/shared:ro,z
+      - ./logs:/logs,z
+    environment:
+      - TZ=Asia/Tehran
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    dns:
+      - 8.8.8.8
+
+  vpn2:
+    image: vpn-client:latest
+    container_name: vpn2
+    hostname: vpn2
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    networks:
+      - vpn2-net
+      - dockervlan
+    volumes:
+      - ./configs/vpn2:/vpn:ro,z
+      - ./shared:/shared:ro,z
+      - ./logs:/logs,z
+    environment:
+      - TZ=Asia/Tehran
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    dns:
+      - 8.8.8.8
+
+  vpn3:
+    image: vpn-client:latest
+    container_name: vpn3
+    hostname: vpn3
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    networks:
+      - vpn3-net
+      - dockervlan
+    volumes:
+      - ./configs/vpn3:/vpn:ro,z
+      - ./shared:/shared:ro,z
+      - ./logs:/logs,z
+    environment:
+      - TZ=Asia/Tehran
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    dns:
+      - 8.8.8.8
+
+  gost:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: gost
+    image: gost-proxy:latest
+    container_name: gost-proxy
+    hostname: gost-proxy
+    restart: unless-stopped
+    depends_on:
+      - vpn1
+      - vpn2
+      - vpn3
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - vpn1-net
+      - vpn2-net
+      - vpn3-net
+    ports:
+      - "1080-1100:1080-1100"
+      - "18080:18080"
+    environment:
+      - TZ=Asia/Tehran
+      - WEBAPI_PORT=18080
+      - WEBAPI_USER=admin
+      - WEBAPI_PASS=gost
+      # - GOST_QUIET=false
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+networks:
+  vpn1-net:
+    driver: bridge
+  vpn2-net:
+    driver: bridge
+  vpn3-net:
+    driver: bridge
+
+  dockervlan:
+    name: dockervlan
+    driver: macvlan
+    driver_opts:
+      parent: eno1 # Required - cannot be auto-detected
+    ipam:
+      config:
+        - subnet: "192.168.0.0/24"
+          ip_range: "192.168.0.64/26"
+          gateway: "192.168.0.1"
