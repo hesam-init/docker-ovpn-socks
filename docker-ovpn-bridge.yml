@@ -119,12 +119,4 @@ networks:
     driver: bridge
 
   docker-ovpn-vlan:
-    name: docker-ovpn-vlan
-    driver: macvlan
-    driver_opts:
-      parent: eno1 # Required - cannot be auto-detected
-    ipam:
-      config:
-        - subnet: "192.168.0.0/24"
-          ip_range: "192.168.0.64/26"
-          # gateway: "192.168.0.1"
+    external: true

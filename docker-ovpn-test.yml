@@ -14,7 +14,7 @@ services:
       - /dev/net/tun
     networks:
       vpn-test: {}
-      docker-vlan-test:
+      docker-ovpn-vlan:
         ipv4_address: 192.168.0.128
     volumes:
       - ./configs/test:/vpn:ro,z
@@ -33,12 +33,5 @@ networks:
   vpn-test:
     driver: bridge
 
-  docker-vlan-test:
-    name: docker-vlan-test
-    driver: macvlan
-    driver_opts:
-      parent: eno1 # Required - cannot be auto-detected
-    ipam:
-      config:
-        - subnet: "192.168.0.0/24"
-          # gateway: "192.168.0.1"
+  docker-ovpn-vlan:
+    external: true
