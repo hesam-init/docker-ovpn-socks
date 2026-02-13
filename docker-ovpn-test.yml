@@ -1,0 +1,44 @@
+services:
+  vpn-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: vpn
+    image: vpn-client:latest
+    container_name: vpn-test
+    hostname: vpn-test
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    networks:
+      vpn-test: {}
+      docker-vlan-test:
+        ipv4_address: 192.168.0.128
+    volumes:
+      - ./configs/vpn2:/vpn:ro,z
+      - ./shared:/shared:ro,z
+      - ./logs:/logs,z
+    environment:
+      - TZ=Asia/Tehran
+      # - CREDENTIALS=true
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    dns:
+      - 8.8.8.8
+
+networks:
+  vpn-test:
+    driver: bridge
+
+  docker-vlan-test:
+    name: docker-vlan-test
+    driver: macvlan
+    driver_opts:
+      parent: eno1 # Required - cannot be auto-detected
+    ipam:
+      config:
+        - subnet: "192.168.0.0/24"
+          # gateway: "192.168.0.1"
