@@ -29,6 +29,14 @@ fi
 # Create iptables setup script
 cat >/tmp/setup-nat.sh <<'SCRIPT'
 #!/bin/sh
+
+FLAG_FILE="/tmp/nat-setup-done"
+
+if [ -f "$FLAG_FILE" ]; then
+   echo "[$(date +'%Y-%m-%d %H:%M:%S')] NAT already configured, skipping" >&2
+   exit 0
+fi
+
 sleep 5
 
 iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
@@ -40,6 +48,8 @@ echo "[$(date +'%Y-%m-%d %H:%M:%S')] NAT routing configured" >&2
 
 gost -L dns://:53/1.1.1.1?mode=udp -L dns://:54/1.1.1.1?mode=tcp &
 echo "[$(date +'%Y-%m-%d %H:%M:%S')] DNS proxy started" >&2
+
+touch "$FLAG_FILE"
 SCRIPT
 
 chmod +x /tmp/setup-nat.sh
