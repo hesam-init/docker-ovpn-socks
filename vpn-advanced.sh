@@ -30,27 +30,30 @@ fi
 cat >/tmp/setup-nat.sh <<'SCRIPT'
 #!/bin/sh
 
-echo "[$(date +'%Y-%m-%d %H:%M:%S')] Setting up NAT routing..." >&2
+echo "[$(date +'%Y-%m-%d %H:%M:%S')] Checking NAT configuration..." >&2
 
-sleep 5
+# Check if NAT rule already exists for tun0
+if iptables -t nat -C POSTROUTING -o tun0 -j MASQUERADE 2>/dev/null; then
+   echo "[$(date +'%Y-%m-%d %H:%M:%S')] NAT already configured, skipping iptables setup" >&2
+else
+   echo "[$(date +'%Y-%m-%d %H:%M:%S')] Setting up NAT routing..." >&2
+   
+   sleep 5
+   
+   iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
+   iptables -A FORWARD -i eth+ -o tun0 -j ACCEPT
+   iptables -A FORWARD -i tun0 -o eth+ -m state --state RELATED,ESTABLISHED -j ACCEPT
+   
+   echo "[$(date +'%Y-%m-%d %H:%M:%S')] NAT routing configured" >&2
+fi
 
-# Flush existing rules to ensure clean state
-iptables -t nat -F POSTROUTING 2>/dev/null || true
-iptables -F FORWARD 2>/dev/null || true
-
-iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
-iptables -A FORWARD -i eth+ -o tun0 -j ACCEPT
-iptables -A FORWARD -i tun0 -o eth+ -m state --state RELATED,ESTABLISHED -j ACCEPT
-
-echo "[$(date +'%Y-%m-%d %H:%M:%S')] NAT routing configured" >&2
-
-# Kill any existing gost processes
-pkill -f "gost.*dns" 2>/dev/null || true
-sleep 1
-
-# Start DNS proxy
-gost -L dns://:53/1.1.1.1?mode=udp -L dns://:54/1.1.1.1?mode=tcp &
-echo "[$(date +'%Y-%m-%d %H:%M:%S')] DNS proxy started (PID: $!)" >&2
+# Start DNS proxy (only if not already running)
+if ! pgrep -f "gost.*dns" >/dev/null 2>&1; then
+    gost -L dns://:53/1.1.1.1?mode=udp -L dns://:54/1.1.1.1?mode=tcp &
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] DNS proxy started (PID: $!)" >&2
+else
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] DNS proxy already running" >&2
+fi
 SCRIPT
 
 chmod +x /tmp/setup-nat.sh
