@@ -125,6 +125,12 @@ services:
     environment:
       - TZ=Asia/Tehran
       - CREDENTIALS=false
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    dns:
+      - 172.17.0.1 # local host machine dns
+      - 8.8.8.8
 
 networks:
   vpn-test:
