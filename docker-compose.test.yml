@@ -1,17 +1,10 @@
 services:
   vpn-test:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: vpn
-    image: vpn-client:latest
+    extends:
+      file: docker-compose.base.yml
+      service: vpn-template
     container_name: vpn-test
     hostname: vpn-test
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun
     networks:
       vpn-test: {}
       docker-ovpn-vlan:
@@ -19,19 +12,12 @@ services:
     volumes:
       - ./configs/test:/vpn:ro,z
       - ./shared:/shared:ro,z
-      - ./logs:/logs,z
+      - ./logs:/logs:z
     environment:
-      - TZ=Asia/Tehran
       - CREDENTIALS=false
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
-    dns:
-      - 8.8.8.8
 
 networks:
   vpn-test:
     driver: bridge
-
   docker-ovpn-vlan:
     external: true

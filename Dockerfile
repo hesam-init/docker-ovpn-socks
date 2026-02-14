@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # BASE STAGE - Common dependencies and configurations
 # ═══════════════════════════════════════════════════════════════════════════════
-FROM alpine:3.23 AS base
+FROM docker.arvancloud.ir/alpine:3.23 AS base
 
 RUN echo "https://mirror.arvancloud.ir/alpine/v3.23/main" > /etc/apk/repositories && \
     echo "https://mirror.arvancloud.ir/alpine/v3.23/community" >> /etc/apk/repositories

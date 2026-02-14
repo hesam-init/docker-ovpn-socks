@@ -25,128 +25,22 @@ Verify:
 docker network inspect docker-ovpn-vlan --format '{{json .IPAM.Config}}'
 ```
 
-### 2. Main Compose (`docker-ovpn-bridge.yml`)
-
-```yaml
-services:
-  vpn1:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: vpn
-    image: vpn-client:latest
-    container_name: vpn1
-    networks:
-      - vpn1-net
-      - docker-ovpn-vlan # LAN IP: auto from 192.168.0.64/26
-    volumes:
-      - ./configs/vpn1:/vpn:ro,z
-      - ./shared:/shared:ro,z
-      - ./logs:/logs,z
-    environment:
-      - TZ=Asia/Tehran
-      - CREDENTIALS=true # Uses shared/auth.txt
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
-
-  # rest vpn profiles...
-
-  gost:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: gost
-    image: gost-proxy:latest
-    container_name: gost-proxy
-    depends_on:
-      - vpn1
-      - vpn2
-      - vpn3
-    networks:
-      - vpn1-net
-      - vpn2-net
-      - vpn3-net # No macvlan—internal routing only
-    ports:
-      - "1080-1100:1080-1100"
-      - "18080:18080"
-    environment:
-      - TZ=Asia/Tehran
-      - WEBAPI_PORT=18080
-      - WEBAPI_USER=admin
-      - WEBAPI_PASS=gost
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-
-networks:
-  vpn1-net:
-    driver: bridge
-  vpn2-net:
-    driver: bridge
-  vpn3-net:
-    driver: bridge
-
-  docker-ovpn-vlan:
-    external: true
-```
-
-### Manage (`docker-ovpn-bridge.yml`)
+### 2. Main Compose (`docker-compose.bridge.yml`)
 
 ```bash
-docker compose -f docker-ovpn-bridge.yml up -d
-docker compose -f docker-ovpn-bridge.yml logs -f
+docker compose -f docker-compose.bridge.yml up -d
+docker compose -f docker-compose.bridge.yml logs -f
 
-docker compose -f docker-ovpn-bridge.yml stop
+docker compose -f docker-compose.bridge.yml stop
 ```
 
-### 3. Test Compose (`docker-ovpn-test.yml`)
-
-```yaml
-services:
-  vpn-test:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: vpn
-    image: vpn-client:latest
-    container_name: vpn-test
-    networks:
-      vpn-test: {}
-      docker-ovpn-vlan:
-        ipv4_address: 192.168.0.164 # Safe (outside .64/26)
-    volumes:
-      - ./configs/test:/vpn:ro,z
-      - ./shared:/shared:ro,z
-      - ./logs:/logs,z
-    environment:
-      - TZ=Asia/Tehran
-      - CREDENTIALS=false
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
-    dns:
-      - 172.17.0.1 # local host machine dns
-      - 8.8.8.8
-
-networks:
-  vpn-test:
-    driver: bridge
-
-  docker-ovpn-vlan:
-    external: true
-```
-
-### Manage (`docker-ovpn-test.yml`)
+### 3. Test Compose (`docker-compose.test.yml`)
 
 ```bash
-docker compose -f docker-ovpn-test.yml up -d
-docker compose -f docker-ovpn-test.yml logs -f
+docker compose -f docker-compose.test.yml up -d
+docker compose -f docker-compose.test.yml logs -f
 
-docker compose -f docker-ovpn-test.yml stop
+docker compose -f docker-compose.test.yml stop
 ```
 
 ### Util Commands

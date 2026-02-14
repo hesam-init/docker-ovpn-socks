@@ -1,79 +1,54 @@
 services:
   vpn1:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: vpn
-    image: vpn-client:latest
+    extends:
+      file: docker-compose.base.yml
+      service: vpn-template
     container_name: vpn1
     hostname: vpn1
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun
     networks:
       - vpn1-net
     volumes:
       - ./configs/vpn1:/vpn:ro,z
       - ./shared:/shared:ro,z
-      - ./logs:/logs,z
-    environment:
-      - TZ=Asia/Tehran
-      # - CREDENTIALS=true
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
+      - ./logs:/logs:z
     dns:
       - 8.8.8.8
+    environment:
+      - CREDENTIALS=true
 
   vpn2:
-    image: vpn-client:latest
+    extends:
+      file: docker-compose.base.yml
+      service: vpn-template
     container_name: vpn2
     hostname: vpn2
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun
     networks:
       - vpn2-net
     volumes:
       - ./configs/vpn2:/vpn:ro,z
       - ./shared:/shared:ro,z
-      - ./logs:/logs,z
-    environment:
-      - TZ=Asia/Tehran
-      # - CREDENTIALS=true
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
+      - ./logs:/logs:z
     dns:
       - 8.8.8.8
+    environment:
+      - CREDENTIALS=true
 
   vpn3:
-    image: vpn-client:latest
+    extends:
+      file: docker-compose.base.yml
+      service: vpn-template
     container_name: vpn3
     hostname: vpn3
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun
     networks:
       - vpn3-net
     volumes:
       - ./configs/vpn3:/vpn:ro,z
       - ./shared:/shared:ro,z
-      - ./logs:/logs,z
-    environment:
-      - TZ=Asia/Tehran
-      # - CREDENTIALS=true
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
+      - ./logs:/logs:z
     dns:
       - 8.8.8.8
+    environment:
+      - CREDENTIALS=true
 
   gost:
     build:
@@ -102,7 +77,6 @@ services:
       - WEBAPI_PORT=18080
       - WEBAPI_USER=admin
       - WEBAPI_PASS=gost
-      # - GOST_QUIET=false
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     ulimits:
@@ -113,9 +87,7 @@ services:
 networks:
   vpn1-net:
     driver: bridge
-
   vpn2-net:
     driver: bridge
-
   vpn3-net:
     driver: bridge
