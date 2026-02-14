@@ -12,6 +12,8 @@ services:
       - ./configs/vpn1:/vpn:ro,z
       - ./shared:/shared:ro,z
       - ./logs:/logs:z
+    environment:
+      - CREDENTIALS=false
 
   vpn2:
     extends:

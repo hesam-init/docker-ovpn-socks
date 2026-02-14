@@ -11,10 +11,8 @@ services:
       - ./configs/vpn1:/vpn:ro,z
       - ./shared:/shared:ro,z
       - ./logs:/logs:z
-    dns:
-      - 8.8.8.8
     environment:
-      - CREDENTIALS=true
+      - CREDENTIALS=false
 
   vpn2:
     extends:
@@ -28,10 +26,6 @@ services:
       - ./configs/vpn2:/vpn:ro,z
       - ./shared:/shared:ro,z
       - ./logs:/logs:z
-    dns:
-      - 8.8.8.8
-    environment:
-      - CREDENTIALS=true
 
   vpn3:
     extends:
@@ -45,10 +39,6 @@ services:
       - ./configs/vpn3:/vpn:ro,z
       - ./shared:/shared:ro,z
       - ./logs:/logs:z
-    dns:
-      - 8.8.8.8
-    environment:
-      - CREDENTIALS=true
 
   gost:
     build:
