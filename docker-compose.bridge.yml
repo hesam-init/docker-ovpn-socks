@@ -44,20 +44,14 @@ services:
       - ./logs:/logs:z
 
   gost:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: gost
-    image: gost-proxy:latest
+    extends:
+      file: docker-compose.base.yml
+      service: gost-template
     container_name: gost-proxy
-    hostname: gost-proxy
-    restart: unless-stopped
     depends_on:
       - vpn1
       - vpn2
       - vpn3
-    cap_add:
-      - NET_ADMIN
     networks:
       - vpn1-net
       - vpn2-net
@@ -65,17 +59,6 @@ services:
     ports:
       - "1080-1100:1080-1100"
       - "18080:18080"
-    environment:
-      - TZ=Asia/Tehran
-      - WEBAPI_PORT=18080
-      - WEBAPI_USER=admin
-      - WEBAPI_PASS=gost
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
 
 networks:
   vpn1-net:

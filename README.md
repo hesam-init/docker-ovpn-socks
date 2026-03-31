@@ -71,6 +71,8 @@ chmod 600 shared/auth.txt
 ### 4. Build and Start
 
 ```bash
+docker compose -f docker-compose.base.yml build
+
 docker compose build
 docker compose up -d
 ```

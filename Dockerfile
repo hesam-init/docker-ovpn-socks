@@ -3,8 +3,8 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 FROM docker.arvancloud.ir/alpine:3.23 AS base
 
-RUN echo "https://mirror.arvancloud.ir/alpine/v3.23/main" > /etc/apk/repositories && \
-    echo "https://mirror.arvancloud.ir/alpine/v3.23/community" >> /etc/apk/repositories
+RUN echo "http://mirror.0-1.ir/alpine/v3.23/main" > /etc/apk/repositories && \
+    echo "http://mirror.0-1.ir/alpine/v3.23/community" >> /etc/apk/repositories
 
 RUN apk update
 RUN apk add --no-cache bash bind-tools curl gost iptables iproute2 openvpn
