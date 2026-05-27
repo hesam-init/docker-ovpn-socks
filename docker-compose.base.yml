@@ -7,6 +7,9 @@ x-logging-default: &logging-default
     max-size: "4m"
     max-file: "1"
 
+x-logging-silent: &logging-silent
+  driver: "none"
+
 services:
   vpn-template:
     build:
@@ -52,7 +55,7 @@ services:
       target: gost
       network: host
     image: gost-proxy:latest
-    logging: *logging-default
+    logging: *logging-silent
     restart: unless-stopped
     hostname: gost-proxy
     cap_add:
