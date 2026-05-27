@@ -70,6 +70,10 @@ resolv-retry infinite
 connect-retry 5
 connect-retry-max 999
 
+route-delay 5
+route-nopull
+redirect-gateway def1 bypass-dhcp
+
 mute-replay-warnings
 
 script-security 2
