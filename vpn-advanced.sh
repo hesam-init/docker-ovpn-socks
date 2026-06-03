@@ -68,7 +68,7 @@ persist-key
 persist-tun
 resolv-retry infinite
 connect-retry 5
-connect-retry-max 999
+connect-retry-max 10
 
 route-delay 5
 route-nopull

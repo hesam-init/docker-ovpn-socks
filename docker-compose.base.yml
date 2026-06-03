@@ -4,7 +4,7 @@
 x-logging-default: &logging-default
   driver: json-file
   options:
-    max-size: "4m"
+    max-size: "2m"
     max-file: "1"
 
 x-logging-silent: &logging-silent
@@ -55,7 +55,7 @@ services:
       target: gost
       network: host
     image: gost-proxy:latest
-    logging: *logging-silent
+    logging: *logging-default
     restart: unless-stopped
     hostname: gost-proxy
     cap_add:
