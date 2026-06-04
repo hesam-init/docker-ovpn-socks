@@ -10,8 +10,19 @@ x-logging-default: &logging-default
 x-logging-silent: &logging-silent
   driver: "none"
 
+# ─────────────────────────────────────────────
+# Process presets
+# ─────────────────────────────────────────────
+x-stop-fast: &stop-fast
+  stop_signal: SIGKILL
+
+x-stop: &stop
+  stop_signal: SIGTERM
+  stop_grace_period: 3s
+
 services:
   vpn-template:
+    <<: *stop-fast
     build:
       context: ${PWD}
       dockerfile: Dockerfile
@@ -49,6 +60,7 @@ services:
         hard: 65536
 
   gost-template:
+    <<: *stop-fast
     build:
       context: ${PWD}
       dockerfile: Dockerfile

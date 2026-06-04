@@ -8,7 +8,7 @@ services:
     networks:
       - vpn1-net
     volumes:
-      - ./configs/vpnbaz/nl1-typ2.ovpn:/vpn/config.ovpn:ro,z
+      - ./configs/vpnbaz/nl3-typ2.ovpn:/vpn/config.ovpn:ro,z
       - ./shared:/shared:ro,z
       - ./logs:/logs:z
 
