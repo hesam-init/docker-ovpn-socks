@@ -1,10 +1,9 @@
 services:
-  vpn1:
+  vpnbaz-socks:
     extends:
       file: docker-compose.base.yml
       service: vpn-template
-    container_name: vpn1
-    hostname: vpn1
+    container_name: ovpn-socks
     environment:
       - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn

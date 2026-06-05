@@ -1,20 +1,22 @@
 services:
-  vpn-test:
+  vpnbaz-bridge:
     extends:
       file: docker-compose.base.yml
       service: vpn-template
-    container_name: vpn-test
-    hostname: vpn-test
+    container_name: vpnbaz-bridge
     networks:
       vpn-test: {}
       docker-ovpn-vlan:
         ipv4_address: 192.168.0.128
-    volumes:
-      - ./configs/test:/vpn:ro,z
-      - ./shared:/shared:ro,z
-      - ./logs:/logs:z
     environment:
+      - PROXY_PORT=1080
+      - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn
       - CREDENTIALS=false
+    ports:
+      - "1080:1080"
+    volumes:
+      - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
+      # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
 
 networks:
   vpn-test:

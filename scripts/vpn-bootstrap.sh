@@ -8,7 +8,7 @@ RUNTIME_CONFIG="/tmp/config-runtime.ovpn"
 AUTH_FILE=${AUTH_FILE:-/etc/openvpn/auth.txt}
 VPN_CONFIG=${VPN_CONFIG:-/etc/openvpn/config.ovpn}
 
-PROXY_PORT=${PROXY_PORT:-1080}
+PROXY_PORT=${PROXY_PORT:-}
 PROXY_USER=${PROXY_USER:-}
 PROXY_PASS=${PROXY_PASS:-}
 

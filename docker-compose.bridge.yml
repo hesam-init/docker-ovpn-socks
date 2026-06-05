@@ -1,20 +1,38 @@
 services:
-  vpn1:
+  vpnbaz-bridge:
     extends:
       file: docker-compose.base.yml
       service: vpn-template
-    container_name: vpn1
-    hostname: vpn1
+    container_name: vpnbaz-bridge
     networks:
-      - vpn1-net
-      - docker-ovpn-vlan
-    volumes:
-      - ./configs/vpn1:/vpn:ro,z
-      - ./shared:/shared:ro,z
-      - ./logs:/logs:z
+      ovpn-bridge: {}
+      docker-ovpn-vlan:
+        ipv4_address: 192.168.0.110
     environment:
-      - CREDENTIALS=false
+      - PROXY_PORT=1080
+      - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn
+    ports:
+      - "1080:1080"
+    volumes:
+      - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
+      # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
+
+  eliteping-bridge:
+    extends:
+      file: docker-compose.base.yml
+      service: vpn-template
+    container_name: eliteping-bridge
+    networks:
+      ovpn-bridge: {}
+      docker-ovpn-vlan:
+        ipv4_address: 192.168.0.120
+    environment:
+      - VPN_CONFIG=/etc/openvpn/nl1.e-mix.ir.ovpn
+    volumes:
+      - ./configs/ovpn-eliteping:/etc/openvpn:ro,z
 
 networks:
+  ovpn-bridge:
+    driver: bridge
   docker-ovpn-vlan:
     external: true
