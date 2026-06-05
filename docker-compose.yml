@@ -5,60 +5,11 @@ services:
       service: vpn-template
     container_name: vpn1
     hostname: vpn1
-    networks:
-      - vpn1-net
-    volumes:
-      - ./configs/vpnbaz/nl3-typ2.ovpn:/vpn/config.ovpn:ro,z
-      - ./shared:/shared:ro,z
-      - ./logs:/logs:z
-
-  # vpn2:
-  #   extends:
-  #     file: docker-compose.base.yml
-  #     service: vpn-template
-  #   container_name: vpn2
-  #   hostname: vpn2
-  #   networks:
-  #     - vpn2-net
-  #   volumes:
-  #     - ./configs/vpn2:/vpn:ro,z
-  #     - ./shared:/shared:ro,z
-  #     - ./logs:/logs:z
-
-  # vpn3:
-  #   extends:
-  #     file: docker-compose.base.yml
-  #     service: vpn-template
-  #   container_name: vpn3
-  #   hostname: vpn3
-  #   networks:
-  #     - vpn3-net
-  #   volumes:
-  #     - ./configs/vpn3:/vpn:ro,z
-  #     - ./shared:/shared:ro,z
-  #     - ./logs:/logs:z
-
-  gost:
-    extends:
-      file: docker-compose.base.yml
-      service: gost-template
-    container_name: gost-proxy
-    depends_on:
-      - vpn1
-      # - vpn2
-      # - vpn3
-    networks:
-      - vpn1-net
-      # - vpn2-net
-      # - vpn3-net
+    environment:
+      - PROXY_PORT=1080
+      - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn
     ports:
-      - "1080-1100:1080-1100"
-      - "18080:18080"
-
-networks:
-  vpn1-net:
-    driver: bridge
-  vpn2-net:
-    driver: bridge
-  vpn3-net:
-    driver: bridge
+      - "1080:1080"
+    volumes:
+      - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
+      # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z

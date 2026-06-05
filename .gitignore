@@ -1,3 +1,4 @@
 logs
-shared/auth.txt
+**.auth
+**auth.txt
 repomix-output.md

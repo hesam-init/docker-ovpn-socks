@@ -12,7 +12,6 @@ MAX_PORT=1100
 BASE_TABLE=100
 BASE_MARK=1
 
-# GOST settings
 GOST_QUIET=${GOST_QUIET:-true}
 WEBAPI_PORT=${WEBAPI_PORT:-18080}
 WEBAPI_USER=${WEBAPI_USER:-"admin"}
@@ -20,12 +19,11 @@ WEBAPI_PASS=${WEBAPI_PASS:-"gost"}
 
 log "Starting Dynamic Gost Proxy Manager..."
 log "Waiting for VPN containers..."
-sleep 15
+sleep 5
 
 log "================================"
 log "Auto-discovering VPN networks..."
 
-# Find all VPN containers by hostname pattern
 VPN_CONTAINERS=""
 i=1
 while [ $i -le 20 ]; do
@@ -58,11 +56,11 @@ for vpn_entry in $VPN_CONTAINERS; do
 
 	log "  Port $PORT -> $VPN_NAME ($VPN_IP)"
 
-	# Setup routing
+	# Setup routing table hooks
 	ip route add default via $VPN_IP table $TABLE 2>/dev/null || true
 	ip rule add fwmark $MARK table $TABLE 2>/dev/null || true
 
-	# Build Gost arguments
+	# Build Gost execution configuration arguments
 	GOST_ARGS="$GOST_ARGS -L=socks5://0.0.0.0:${PORT}?so_mark=${MARK}&resolver=tcp://${VPN_IP}:54"
 
 	PORT=$((PORT + 1))

@@ -47,7 +47,7 @@ docker compose -f docker-compose.test.yml stop
 
 ```bash
 # VPN IPs on LAN
-docker inspect vpn1 vpn2 vpn3 vpn-test --format '{{.Name}}: {{index .NetworkSettings.Networks "docker-ovpn-vlan" "IPAddress"}}'
+docker inspect vpn1 --format '{{.Name}}: {{index .NetworkSettings.Networks "docker-ovpn-vlan" "IPAddress"}}'
 
 # Gost routes (in container)
 docker exec gost-proxy ip rule show; ip route show table 100

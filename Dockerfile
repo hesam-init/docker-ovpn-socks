@@ -7,7 +7,7 @@ RUN echo "http://mirror.0-1.ir/alpine/v3.23/main" > /etc/apk/repositories && \
     echo "http://mirror.0-1.ir/alpine/v3.23/community" >> /etc/apk/repositories
 
 RUN apk update
-RUN apk add --no-cache bash bind-tools curl gost iptables iproute2 openvpn
+RUN apk add --no-cache bash bind-tools curl gost dante dante-server iptables iproute2 openvpn
 
 RUN rm -rf /var/cache/apk/*
 
@@ -16,8 +16,9 @@ RUN rm -rf /var/cache/apk/*
 # ═══════════════════════════════════════════════════════════════════════════════
 FROM base AS vpn
 
-COPY vpn-advanced.sh /usr/local/bin/startup.sh
-RUN chmod +x /usr/local/bin/startup.sh
+COPY scripts/vpn-bootstrap.sh /usr/local/bin/startup.sh
+COPY scripts/vpn-nat.sh /usr/local/bin/setup-nat.sh
+RUN chmod +x /usr/local/bin/startup.sh /usr/local/bin/setup-nat.sh
 
 CMD ["/usr/local/bin/startup.sh"]
 
@@ -26,7 +27,7 @@ CMD ["/usr/local/bin/startup.sh"]
 # ═══════════════════════════════════════════════════════════════════════════════
 FROM base AS gost
 
-COPY gost-startup.sh /usr/local/bin/startup.sh
+COPY scripts/gost-bootstrap.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh
 
 CMD ["/usr/local/bin/startup.sh"]
