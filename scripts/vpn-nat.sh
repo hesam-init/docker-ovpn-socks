@@ -40,14 +40,6 @@ else
     log "WARNING: Could not automatically detect original default gateway — skipping LAN bypass routing."
 fi
 
-# ─── DNS Proxy ────────────────────────────────────────────────────────────────
-if ! pgrep -f "gost.*dns" >/dev/null 2>&1; then
-    gost -L "dns://:53/1.1.1.1?mode=udp" -L "dns://:54/1.1.1.1?mode=tcp" &
-    log "DNS proxy started on :53 (UDP) and :54 (TCP)"
-else
-    log "DNS proxy already running"
-fi
-
 # ─── SOCKS5 Proxy (Dante Server Implementation) ───────────────────────────────
 if [ -n "$PROXY_PORT" ]; then
     if pgrep sockd >/dev/null 2>&1; then

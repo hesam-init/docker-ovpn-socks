@@ -58,31 +58,3 @@ services:
       nofile:
         soft: 65536
         hard: 65536
-
-  gost-template:
-    <<: *stop-fast
-    build:
-      context: ${PWD}
-      dockerfile: Dockerfile
-      target: gost
-      network: host
-    image: gost-proxy:latest
-    logging: *logging-default
-    restart: unless-stopped
-    hostname: gost-proxy
-    cap_add:
-      - NET_ADMIN
-    ports:
-      - "1080-1100:1080-1100"
-      - "18080:18080"
-    environment:
-      - TZ=Asia/Tehran
-      - WEBAPI_PORT=18080
-      - WEBAPI_USER=admin
-      - WEBAPI_PASS=gost
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
