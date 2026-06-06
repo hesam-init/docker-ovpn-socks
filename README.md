@@ -1,35 +1,64 @@
 # Docker VPN SOCKS Router
 
-A lightweight, containerized solution for running multiple VPN connections with individual SOCKS5 proxies. One Gost container manages all proxies, routing traffic through separate OpenVPN containers based on port selection.
-
-## Features
-
-- **Single Proxy Manager**: One Gost container handles all SOCKS5 proxies
-- **Multiple VPN Support**: Route different traffic through different VPN servers
-- **Port-based Routing**: Each SOCKS5 port routes through a specific VPN
-- **Pure Docker**: No host network configuration needed
-- **Policy-based Routing**: Uses Linux fwmark and ip rules for traffic separation
-- **Alpine Linux**: Minimal image size and resource usage
-- **Easy to Scale**: Add more VPN connections by duplicating service blocks
+A lightweight, containerized solution for running OpenVPN clients with embedded SOCKS5 proxies. Each VPN container runs its own Dante SOCKS5 server bound directly to the VPN tunnel interface (`tun0`), so clients route traffic through a specific VPN by choosing its port.
 
 ## Architecture
 
 ```
-Client → SOCKS5 Port 1080 → Gost Container → VPN1 Container → Internet (IP1)
-Client → SOCKS5 Port 1081 → Gost Container → VPN2 Container → Internet (IP2)
+Client → SOCKS5 Port 1080 → VPN Container (Dante on tun0) → OpenVPN Tunnel → Internet (VPN IP)
+Client → SOCKS5 Port 1081 → VPN Container (Dante on tun0) → OpenVPN Tunnel → Internet (VPN IP)
 ```
 
-### Components
+Each container is self-contained: one OpenVPN process + one Dante daemon, no separate proxy container.
 
-- **VPN Containers** (`vpn1`, `vpn2`): OpenVPN clients with NAT masquerading
-- **Gost Container** (`gost-proxy`): Single SOCKS5 server with policy-based routing
-- **Docker Networks**: Separate networks for each VPN tunnel
+### Network Flow
+
+```
+Application
+    ↓ (SOCKS5 request to port 1080)
+VPN Container (Dante)
+    ↓ (bound to tun0, exits via OpenVPN tunnel)
+iptables MASQUERADE on tun0
+    ↓
+Internet (with VPN IP)
+```
+
+## Features
+
+- **Self-contained containers**: Each VPN container runs its own embedded Dante SOCKS5 server
+- **Multiple VPN support**: Run multiple VPN containers on different ports simultaneously
+- **Optional SOCKS5 auth**: Set `PROXY_USER`/`PROXY_PASS` for username auth, or leave unset for open proxy
+- **Policy-based routing**: Asymmetric routing fix via a dedicated routing table (table 128)
+- **LAN bypass**: Local subnets (`10/8`, `172.16/12`, `192.168/16`) never go through the VPN tunnel
+- **Macvlan support**: Assign real LAN IPs to containers for direct LAN access without port-forwarding
+- **Alpine Linux**: Minimal image size (~50MB per container)
+- **Easy to scale**: Add more VPN connections by duplicating service blocks
 
 ## Prerequisites
 
 - Docker and Docker Compose
-- OpenVPN configuration files (.ovpn)
-- VPN credentials
+- OpenVPN configuration files (`.ovpn`)
+- VPN credentials (`auth.txt` with username on line 1, password on line 2)
+
+## Directory Structure
+
+```
+docker-ovpn-socks/
+├── Dockerfile                     # Multi-stage: base (Alpine) + vpn
+├── docker-compose.yml             # Simple single-VPN deployment
+├── docker-compose.base.yml        # Reusable vpn-template service definition
+├── docker-compose.bridge.yml      # Multi-VPN with macvlan LAN IPs
+├── docker-compose.test.yml        # Test environment (no credentials required)
+├── scripts/
+│   ├── vpn-bootstrap.sh           # Container entrypoint: validates config, starts OpenVPN
+│   └── vpn-nat.sh                 # OpenVPN `up` hook: configures NAT, routing, and Dante
+├── configs/
+│   ├── ovpn-vpnbaz/               # VPNBaz provider configs (nl1–nl4, smart) + auth.txt
+│   ├── ovpn-eliteping/            # ElitePing provider configs (ir/de/nl/tr) + auth.txt
+│   └── shared/
+│       └── auth-example.auth.txt  # Example credentials format
+└── BRIDGE.md                      # Macvlan networking setup guide
+```
 
 ## Quick Start
 
@@ -40,24 +69,16 @@ git clone https://github.com/hesam-init/docker-ovpn-socks.git
 cd docker-ovpn-socks
 ```
 
-### 2. Setup Directory Structure
+### 2. Add VPN Configurations
+
+Place your `.ovpn` file and `auth.txt` inside a config directory:
 
 ```bash
-mkdir -p configs/{vpn1,vpn2} shared logs
+mkdir -p configs/myvpn
+cp my-server.ovpn configs/myvpn/config.ovpn
 ```
 
-### 3. Add VPN Configurations
-
-```bash
-# Add your OpenVPN config files
-nano configs/vpn1/config.ovpn
-nano configs/vpn2/config.ovpn
-
-# Add VPN credentials
-nano shared/auth.txt
-```
-
-**shared/auth.txt** format:
+**`configs/myvpn/auth.txt`** format:
 
 ```
 your_vpn_username
@@ -65,160 +86,157 @@ your_vpn_password
 ```
 
 ```bash
-chmod 600 shared/auth.txt
+chmod 600 configs/myvpn/auth.txt
+```
+
+### 3. Configure Compose
+
+Edit `docker-compose.yml` to point at your config:
+
+```yaml
+services:
+  myvpn-socks:
+    extends:
+      file: docker-compose.base.yml
+      service: vpn-template
+    container_name: myvpn-socks
+    environment:
+      - PROXY_PORT=1080
+      - VPN_CONFIG=/etc/openvpn/config.ovpn
+    ports:
+      - "1080:1080"
+    volumes:
+      - ./configs/myvpn:/etc/openvpn:ro,z
 ```
 
 ### 4. Build and Start
 
 ```bash
 docker compose -f docker-compose.base.yml build
-
-docker compose build
 docker compose up -d
 ```
 
-### 5. Test Proxies
+### 5. Test Proxy
 
 ```bash
 # Check your real IP
 curl ifconfig.me
 
+# Check VPN IP through proxy
 curl --proxy socks5h://127.0.0.1:1080 ifconfig.me
-curl --proxy socks5h://127.0.0.1:1081 ifconfig.me
 ```
 
-## Directory Structure
+## Environment Variables
 
+| Variable | Default | Description |
+|---|---|---|
+| `VPN_CONFIG` | `/etc/openvpn/config.ovpn` | Path to the `.ovpn` file inside the container |
+| `AUTH_FILE` | `/etc/openvpn/auth.txt` | Path to the credentials file |
+| `CREDENTIALS` | `true` | Set to `false` to skip auth file requirement |
+| `PROXY_PORT` | _(empty)_ | Port for Dante SOCKS5 server; leave unset to disable proxy |
+| `PROXY_USER` | _(empty)_ | SOCKS5 username (requires `PROXY_PASS`) |
+| `PROXY_PASS` | _(empty)_ | SOCKS5 password (requires `PROXY_USER`) |
+
+## Compose Files
+
+### `docker-compose.yml` — Simple Deployment
+
+Single VPN container with port-mapped SOCKS5 on port `1080`. Use this for a basic setup.
+
+```bash
+docker compose up -d
+docker compose logs -f
 ```
-docker-vpn-socks/
-├── Dockerfile              # Dockerfile
-├── docker-compose.yml      # Service definitions
-├── vpn-startup.sh          # VPN initialization script
-├── gost-startup.sh         # Gost routing configuration
-├── shared/
-│   └── auth.txt            # VPN credentials (create this)
-├── configs/
-│   ├── vpn1/
-│   │   └── config.ovpn     # VPN1 OpenVPN config (add yours)
-│   └── vpn2/
-│       └── config.ovpn     # VPN2 OpenVPN config (add yours)
-└── logs/                   # OpenVPN logs
+
+### `docker-compose.bridge.yml` — Multi-VPN with Macvlan
+
+Two VPN containers (`vpnbaz-bridge`, `eliteping-bridge`), each with a real LAN IP via macvlan. Requires the external `docker-ovpn-vlan` macvlan network to exist first (see `BRIDGE.md`).
+
+```bash
+docker compose -f docker-compose.bridge.yml up -d
+docker compose -f docker-compose.bridge.yml logs -f
 ```
 
-## Configuration
+| Container | LAN IP | Port | Config |
+|---|---|---|---|
+| `vpnbaz-bridge` | `192.168.0.110` | `1080` | `nl1-typ2.ovpn` |
+| `eliteping-bridge` | `192.168.0.120` | `1081` | `ir.de1.e-mix.ir.ovpn` |
 
-### Adding More VPN Connections
+### `docker-compose.test.yml` — Test Environment
 
-1. Create new config directory:
+Single container with `CREDENTIALS=false` for testing configs that don't require authentication.
+
+```bash
+docker compose -f docker-compose.test.yml up -d
+```
+
+## Adding More VPN Connections
+
+1. Add a config directory with your `.ovpn` and `auth.txt`:
 
 ```bash
 mkdir -p configs/vpn3
+cp server.ovpn configs/vpn3/config.ovpn
+cp credentials.txt configs/vpn3/auth.txt
 ```
 
-1. Add OpenVPN config:
-
-```bash
-nano configs/vpn3/config.ovpn
-```
-
-1. Add service to `docker-compose.yml`:
+2. Add a new service to your compose file using `extends`:
 
 ```yaml
-vpn3:
-  image: vpn-client:latest
-  container_name: vpn3
-  hostname: vpn3
-  restart: unless-stopped
-  cap_add:
-    - NET_ADMIN
-  devices:
-    - /dev/net/tun
-  networks:
-    - vpn3-net
-  volumes:
-    - ./configs/vpn3:/vpn:ro
-    - ./shared:/shared:ro
-    - ./logs:/logs
+vpn3-socks:
+  extends:
+    file: docker-compose.base.yml
+    service: vpn-template
+  container_name: vpn3-socks
   environment:
-    - TZ=Asia/Tehran
-  sysctls:
-    - net.ipv4.ip_forward=1
-    - net.ipv4.conf.all.src_valid_mark=1
-  dns:
-    - 8.8.8.8
+    - PROXY_PORT=1082
+    - VPN_CONFIG=/etc/openvpn/config.ovpn
+  ports:
+    - "1082:1082"
+  volumes:
+    - ./configs/vpn3:/etc/openvpn:ro,z
 ```
 
-1. Add network:
-
-```yaml
-vpn3-net:
-  driver: bridge
-```
-
-1. Update Gost container networks:
-
-```yaml
-gost:
-  networks:
-    - vpn1-net
-    - vpn2-net
-    - vpn3-net # Add this
-```
-
-1. Update `gost-startup.sh` to add routing for vpn3:
+3. Start the new service:
 
 ```bash
-VPN3_IP=$(getent hosts vpn3 | awk '{print $1}')
-ip route add default via $VPN3_IP table 102 2>/dev/null || true
-ip rule add fwmark 3 table 102 2>/dev/null || true
-gost -L="socks5://0.0.0.0:1082?so_mark=3" &
-```
-
-1. Expose new port in docker-compose.yml:
-
-```yaml
-ports:
-  - "1080:1080"
-  - "1081:1081"
-  - "1082:1082" # Add this
-```
-
-### Customizing Ports
-
-Edit `gost-startup.sh` to change SOCKS5 ports:
-
-```bash
-gost -L="socks5://0.0.0.0:YOUR_PORT?so_mark=1" &
-```
-
-Update `docker-compose.yml` port mapping:
-
-```yaml
-ports:
-  - "YOUR_PORT:YOUR_PORT"
+docker compose up -d vpn3-socks
 ```
 
 ## Usage Examples
 
-### Browser Configuration
-
-**Firefox:**
-
-1. Settings → Network Settings → Manual proxy configuration
-2. SOCKS Host: `127.0.0.1`, Port: `1080` (for VPN1)
-3. Select "SOCKS v5"
-
 ### Command Line
 
 ```bash
-# Using curl
+# curl
 curl --proxy socks5h://127.0.0.1:1080 https://ipinfo.io
 
-# Using wget
+# wget
 wget -e use_proxy=yes -e https_proxy=socks5h://127.0.0.1:1080 https://ipinfo.io
 
-# Using git
+# git
 git config --global http.proxy socks5h://127.0.0.1:1080
+```
+
+### With SOCKS5 Authentication
+
+If `PROXY_USER` and `PROXY_PASS` are set:
+
+```bash
+curl --proxy socks5h://user:pass@127.0.0.1:1080 https://ipinfo.io
+```
+
+### Browser (Firefox)
+
+1. Settings → Network Settings → Manual proxy configuration
+2. SOCKS Host: `127.0.0.1`, Port: `1080`
+3. Select "SOCKS v5"
+
+### Macvlan (Direct LAN Access)
+
+```bash
+# Access by real LAN IP from any device on the network
+curl --proxy socks5://192.168.0.110:1080 https://ipinfo.io
 ```
 
 ## Management Commands
@@ -228,152 +246,121 @@ git config --global http.proxy socks5h://127.0.0.1:1080
 docker compose logs -f
 
 # View specific container logs
-docker logs -f vpn1
-docker logs -f gost-proxy
+docker logs -f ovpn-socks
 
-# Restart services
-docker compose restart
-
-# Restart specific VPN
-docker compose restart vpn1
+# Restart a service
+docker compose restart ovpn-socks
 
 # Stop all services
 docker compose down
 
-# Rebuild after configuration changes
+# Rebuild after changes
 docker compose build --no-cache
 docker compose up -d
 
 # Shell access
-docker exec -it vpn1 sh
-docker exec -it gost-proxy sh
+docker exec -it ovpn-socks sh
 ```
 
 ## Troubleshooting
 
-### Check VPN Connection
+### Check VPN Tunnel
 
 ```bash
-# Check if VPN tunnel is up
-docker exec vpn1 ip addr show tun0
+# Verify tun0 interface is up
+docker exec ovpn-socks ip addr show tun0
 
-# Check VPN IP
-docker exec vpn1 curl ifconfig.me
-
-# Check OpenVPN logs
-tail -f logs/vpn1.log
-```
-
-### Check Routing
-
-```bash
-# Check Gost routing tables
-docker exec gost-proxy ip route show table 100
-docker exec gost-proxy ip route show table 101
-
-# Check routing rules
-docker exec gost-proxy ip rule show
-
-# Check DNS resolution
-docker exec gost-proxy getent hosts vpn1
-docker exec gost-proxy getent hosts vpn2
+# Check external IP through VPN
+docker exec ovpn-socks curl ifconfig.me
 ```
 
 ### Check NAT Rules
 
 ```bash
-# View iptables NAT rules in VPN container
-docker exec vpn1 iptables -t nat -L -n -v
+# View iptables NAT rules
+docker exec ovpn-socks iptables -t nat -L -n -v | grep MASQUERADE
+```
+
+### Check Routing Tables
+
+```bash
+# Main routing table
+docker exec ovpn-socks ip route show
+
+# Policy routing table (reply path fix)
+docker exec ovpn-socks ip route show table 128
+
+# Routing rules
+docker exec ovpn-socks ip rule show
+```
+
+### Check Dante Status
+
+```bash
+# Verify Dante is running
+docker exec ovpn-socks pgrep -a sockd
 ```
 
 ### Common Issues
 
-**Problem:** "no route to host" errors
-
-**Solution:** Check if VPN containers have established tunnels and NAT is configured:
-
-```bash
-docker exec vpn1 ip addr show tun0
-docker exec vpn1 iptables -t nat -L -n -v | grep MASQUERADE
-```
-
 **Problem:** Proxy connects but no internet
 
-**Solution:** Verify VPN container can access internet:
+**Solution:** Verify the VPN tunnel is up and NAT is configured:
 
 ```bash
-docker exec vpn1 curl -I google.com
+docker exec ovpn-socks ip addr show tun0
+docker exec ovpn-socks iptables -t nat -L -n -v | grep MASQUERADE
 ```
 
-**Problem:** DNS resolution fails
+**Problem:** Connections from LAN drop or reset
 
-**Solution:** Ensure containers are on the same Docker network:
+**Solution:** Check policy routing table 128 is set up (handles reply asymmetry for macvlan setups):
 
 ```bash
-docker network inspect docker-vpn-socks-router_vpn1-net
+docker exec ovpn-socks ip route show table 128
+docker exec ovpn-socks ip rule show
 ```
+
+**Problem:** Local network addresses routed through VPN
+
+**Solution:** LAN bypass routes should be present in the main table:
+
+```bash
+docker exec ovpn-socks ip route show | grep -E '10\.|172\.|192\.168'
+```
+
+**Problem:** `AUTH_FILE not found` on startup
+
+**Solution:** Ensure `auth.txt` exists in the mounted config directory, or set `CREDENTIALS=false` if the VPN does not require authentication.
 
 ## Technical Details
 
 ### How It Works
 
-1. **VPN Containers** establish OpenVPN tunnels and configure iptables NAT masquerading
-2. **Gost Container** connects to multiple Docker networks (one per VPN)
-3. **Policy Routing** uses SO_MARK on sockets and ip rules to direct traffic
-4. **Docker DNS** automatically resolves container hostnames to IPs
-5. **NAT Forwarding** in VPN containers routes Gost traffic through VPN tunnels
+1. `vpn-bootstrap.sh` validates env vars, builds a runtime `.ovpn` config with auto-reconnect directives and `up` hook, then starts OpenVPN
+2. Once `tun0` is established, OpenVPN calls `vpn-nat.sh`
+3. `vpn-nat.sh` configures iptables NAT (`MASQUERADE` on `tun0`), policy routing table 128 (reply path fix), LAN bypass routes, then starts Dante bound to `tun0`
+4. Dante accepts SOCKS5 connections on `PROXY_PORT` and proxies them out through the VPN tunnel
 
-### Network Flow
+### Security Considerations
 
-```
-Application
-    ↓ (SOCKS5 request to port 1080)
-Gost Container
-    ↓ (SO_MARK=1, routes via table 100)
-Docker Network (vpn1-net)
-    ↓ (to gateway vpn1)
-VPN1 Container
-    ↓ (iptables MASQUERADE to tun0)
-OpenVPN Tunnel
-    ↓
-Internet (with VPN1 IP)
-```
+- VPN credentials are stored in plaintext in `auth.txt` — use `chmod 600` and restrict volume mounts with `:ro`
+- Containers require `NET_ADMIN` capability for network configuration
+- Use `PROXY_USER`/`PROXY_PASS` to restrict SOCKS5 access if the port is exposed on a shared network
+- Consider Docker secrets for production deployments
 
-## Security Considerations
+### Performance
 
-- VPN credentials are stored in plaintext in `shared/auth.txt` - use proper file permissions (chmod 600)
-- Containers run with `NET_ADMIN` capability for network configuration
-- OpenVPN logs may contain sensitive information
-- Consider using Docker secrets for production deployments
+- **Memory**: ~50MB per VPN container
+- **CPU**: Minimal at idle, scales with traffic throughput
+- **Latency**: Adds ~5–20ms depending on VPN server location
 
-## Performance
+## Acknowledgments
 
-- **Memory**: ~50MB per VPN container, ~30MB for Gost container
-- **CPU**: Minimal when idle, depends on traffic throughput
-- **Latency**: Adds ~5-20ms depending on VPN server location
+- [Dante](https://www.inet.no/dante/) - SOCKS5 server
+- [OpenVPN](https://openvpn.net/) - VPN protocol
+- [Alpine Linux](https://alpinelinux.org/) - Base image
 
 ## License
 
 :)
-
-## Contributing
-
-Pull requests are welcome! For major changes, please open an issue first.
-
-## Acknowledgments
-
-- [Gost](https://github.com/ginuerzh/gost) - GO Simple Tunnel
-- [OpenVPN](https://openvpn.net/) - VPN protocol
-- [Alpine Linux](https://alpinelinux.org/) - Base image
-
-## Support
-
-For issues and questions:
-
-- Open an issue on GitHub
-- Check existing issues for solutions
-- Review Docker and OpenVPN logs
-
----
-
-**Star this repo if you find it useful!** ⭐
