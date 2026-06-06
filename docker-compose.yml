@@ -6,7 +6,7 @@ services:
     container_name: ovpn-socks
     environment:
       - PROXY_PORT=1080
-      - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn
+      - VPN_CONFIG=/etc/openvpn/smart.ovpn
     ports:
       - "1080:1080"
     volumes:
