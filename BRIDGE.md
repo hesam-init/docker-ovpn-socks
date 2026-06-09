@@ -1,7 +1,7 @@
 # Docker Bridge + Macvlan Networking Guide (VPN-SOCKS Repo)
 
 - **Bridge** (`vpn1-net`, `vpn2-net`, `vpn3-net`): Gost discovers VPN containers via Docker DNS (`getent hosts vpn1`), routes via policy tables (fwmark).
-- **Macvlan** (`docker-ovpn-vlan`): VPN containers get real LAN IPs for direct access (e.g., ping `192.168.0.65`). [docs.docker](https://docs.docker.com/engine/network/drivers/macvlan/)
+- **Macvlan** (`docker-ovpn-vlan`): VPN containers get real LAN IPs for direct access (e.g., ping `192.168.0.110`). [docs.docker](https://docs.docker.com/engine/network/drivers/macvlan/)
 - **Gost**: Connects only to bridges, exposes `1080-1100` SOCKS5 ports per VPN.
 
 ## Setup: External Macvlan (No Conflicts)
@@ -13,11 +13,11 @@ docker network create \
   --driver macvlan \
   -o parent=eno1 \
   --subnet=192.168.0.0/24 \
-  --ip-range=192.168.0.64/26 \
+  --ip-range=192.168.0.100/27 \
   docker-ovpn-vlan
 ```
 
-**Reserved**: `192.168.0.64–127` (64 IPs for VPN containers). [reddit](https://www.reddit.com/r/docker/comments/18x9d84/create_macvlan_with_same_ip_range_as_subnet/)
+**Reserved**: `192.168.0.100–128` (IPs for VPN containers). [reddit](https://www.reddit.com/r/docker/comments/18x9d84/create_macvlan_with_same_ip_range_as_subnet/)
 
 Verify:
 
@@ -63,8 +63,14 @@ curl --proxy socks5://127.0.0.1:1081 ifconfig.me  # VPN2 IP
 sudo ip link add docker-shim link eno1 type macvlan mode bridge
 sudo ip addr add 192.168.0.163/32 dev docker-shim
 sudo ip link set docker-shim up
-sudo ip route add 192.168.0.64/26 dev docker-shim
-ping 192.168.0.65  # Now works!
+sudo ip route add 192.168.0.100/27 dev docker-shim
+ping 192.168.0.110  # Now works!
+```
+
+To remove the host macvlan shim interface:
+
+```bash
+sudo ip link delete docker-shim
 ```
 
 ## Scaling
