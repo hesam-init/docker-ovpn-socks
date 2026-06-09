@@ -11,6 +11,11 @@ PROXY_PORT=${PROXY_PORT:-}
 PROXY_USER=${PROXY_USER:-}
 PROXY_PASS=${PROXY_PASS:-}
 
+# Network environment variables (detected dynamically at runtime by detect_networking)
+ORIG_DEV=""
+ORIG_GW=""
+ORIG_IP=""
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 ts()    { date +'%Y-%m-%d %H:%M:%S'; }
 log()   { echo "[$(ts)] [INFO] $1" >&2; }
@@ -19,7 +24,10 @@ error() { echo "[$(ts)] [ERROR] $1" >&2; exit 1; }
 
 # Idempotent iptables: only appends the rule if it does not already exist
 ipt_add() {
-	table="$1"; chain="$2"; shift 2
+	local table="$1"
+	local chain="$2"
+	shift 2
+
 	if ! iptables -t "$table" -C "$chain" "$@" 2>/dev/null; then
 		iptables -t "$table" -A "$chain" "$@"
 		return 0 # newly added
@@ -36,21 +44,40 @@ ip_rule_add() {
 
 # ─── Steps ────────────────────────────────────────────────────────────────────
 detect_networking() {
-	eval "$(ip -4 route show default | head -n 1 | awk '{
-		printf "ORIG_GW=%s\nORIG_DEV=%s\n", $3, $5
-	}')"
+	log "Detecting original default network route and interface..."
 
+	# Get the default route line (e.g. "default via 172.18.0.1 dev eth0")
+	local default_route
+	default_route=$(ip -4 route show default | head -n 1)
+
+	if [ -z "$default_route" ]; then
+		warn "No default IPv4 route detected."
+		return
+	fi
+
+	# Parse the gateway and device from the default route line
+	ORIG_GW=$(echo "$default_route" | awk '{print $3}')
+	ORIG_DEV=$(echo "$default_route" | awk '{print $5}')
+
+	# Parse the IP address assigned to the original interface
 	if [ -n "$ORIG_DEV" ]; then
-		ORIG_IP=$(ip -4 addr show "$ORIG_DEV" 2>/dev/null \
+		ORIG_IP=$(ip -4 addr show dev "$ORIG_DEV" 2>/dev/null \
 			| awk '/inet / {split($2, a, "/"); print a[1]; exit}')
 	fi
+
+	# Log the detected configuration for debugging/transparency
+	log "Detected network configuration:"
+	log "  - Interface (ORIG_DEV): ${ORIG_DEV:-unknown}"
+	log "  - Gateway   (ORIG_GW):  ${ORIG_GW:-unknown}"
+	log "  - IP Address(ORIG_IP):  ${ORIG_IP:-unknown}"
 }
 
 setup_nat() {
 	log "Checking NAT & forwarding rules..."
 	local changed=0
-	ipt_add nat POSTROUTING -o tun0 -j MASQUERADE                                && changed=1
-	ipt_add filter FORWARD -i eth+ -o tun0 -j ACCEPT                             && changed=1
+	
+	ipt_add nat POSTROUTING -o tun0 -j MASQUERADE && changed=1
+	ipt_add filter FORWARD -i eth+ -o tun0 -j ACCEPT && changed=1
 	ipt_add filter FORWARD -i tun0 -o eth+ -m state --state RELATED,ESTABLISHED -j ACCEPT && changed=1
 
 	if [ "$changed" -eq 1 ]; then
@@ -64,14 +91,14 @@ setup_policy_routing() {
 	# Table 128 forces traffic sourced from the bridge IP to exit via the bridge
 	# gateway. This prevents asymmetric routing when the container has multiple
 	# interfaces (e.g. VLAN on eth1) and host port-forwards land on the bridge IP.
-	[ -n "$ORIG_IP" ] && [ -n "$ORIG_GW" ] || {
-		warn "Missing IP or Gateway for policy routing"
+	if [ -z "$ORIG_IP" ] || [ -z "$ORIG_GW" ]; then
+		warn "Missing IP or Gateway for policy routing — skipping policy routing"
 		return 0
-	}
+	fi
 
 	log "Enforcing policy-based routing for port-forward replies on $ORIG_DEV ($ORIG_IP)..."
 	ip_rule_add from "$ORIG_IP" table 128
-	ip route replace table 128 to "$ORIG_IP/32"  dev "$ORIG_DEV"
+	ip route replace table 128 to "$ORIG_IP/32" dev "$ORIG_DEV"
 	ip route replace table 128 default via "$ORIG_GW" dev "$ORIG_DEV"
 }
 
@@ -79,10 +106,10 @@ setup_lan_bypass() {
 	# Allow the container to reach RFC-1918 private ranges directly via the bridge
 	# gateway instead of tunneling them through OpenVPN. The kernel will still
 	# prefer more-specific connected routes (e.g. the eth1 /24 VLAN subnet).
-	[ -n "$ORIG_GW" ] && [ -n "$ORIG_DEV" ] || {
+	if [ -z "$ORIG_GW" ] || [ -z "$ORIG_DEV" ]; then
 		warn "Could not detect original default gateway — skipping LAN bypass"
 		return 0
-	}
+	fi
 
 	log "Applying VPN bypass routes for RFC-1918 networks..."
 	ip route replace 10.0.0.0/8     via "$ORIG_GW" dev "$ORIG_DEV"
@@ -101,21 +128,23 @@ setup_dante() {
 		return 0
 	fi
 
+	local socks_method="none"
+	local auth_desc="(no auth)"
+
 	if [ -n "$PROXY_USER" ] && [ -n "$PROXY_PASS" ]; then
-		id "$PROXY_USER" >/dev/null 2>&1 || adduser -D -H -s /sbin/nologin "$PROXY_USER"
+		if ! id "$PROXY_USER" >/dev/null 2>&1; then
+			adduser -D -H -s /sbin/nologin "$PROXY_USER"
+		fi
 		echo "$PROXY_USER:$PROXY_PASS" | chpasswd
-		SOCKSMETHOD="username"
-		AUTH_DESC="(auth: $PROXY_USER / ***)"
-	else
-		SOCKSMETHOD="none"
-		AUTH_DESC="(no auth)"
+		socks_method="username"
+		auth_desc="(auth: $PROXY_USER / ***)"
 	fi
 
 	cat > /tmp/sockd.conf <<EOF
 logoutput: stderr
 internal: 0.0.0.0 port = ${PROXY_PORT}
 external: tun0
-socksmethod: ${SOCKSMETHOD}
+socksmethod: ${socks_method}
 clientmethod: none
 
 user.privileged: root
@@ -133,7 +162,7 @@ socks pass {
 EOF
 
 	sockd -D -f /tmp/sockd.conf
-	log "Dante SOCKS5 proxy started on :${PROXY_PORT} ${AUTH_DESC}"
+	log "Dante SOCKS5 proxy started on :${PROXY_PORT} ${auth_desc}"
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
