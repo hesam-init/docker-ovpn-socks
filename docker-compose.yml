@@ -26,3 +26,16 @@ services:
     volumes:
       - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
       # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
+
+  eliteping-socks:
+    extends:
+      file: docker-compose.base.yml
+      service: vpn-template
+    container_name: eliteping
+    environment:
+      - PROXY_PORT=1080
+      - VPN_CONFIG=/etc/openvpn/tr2-tcp.e-mix.ir.ovpn
+    ports:
+      - "1090:1080"
+    volumes:
+      - ./configs/ovpn-eliteping:/etc/openvpn:ro,z
