@@ -9,10 +9,7 @@ services:
       docker-ovpn-vlan:
         ipv4_address: 192.168.0.110
     environment:
-      - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn
-    ports:
-      - "1080:1080"
     volumes:
       - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
       # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
@@ -27,10 +24,7 @@ services:
       docker-ovpn-vlan:
         ipv4_address: 192.168.0.120
     environment:
-      - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/nl2.e-mix.ir.ovpn
-    ports:
-      - "1081:1080"
     volumes:
       - ./configs/ovpn-eliteping:/etc/openvpn:ro,z
 
