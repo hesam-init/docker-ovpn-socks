@@ -14,10 +14,13 @@ PROXY_USER=${PROXY_USER:-}
 PROXY_PASS=${PROXY_PASS:-}
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
-ts()    { date +'%Y-%m-%d %H:%M:%S'; }
-log()   { echo "[$(ts)] [INFO] $1" >&2; }
-warn()  { echo "[$(ts)] [WARN] $1" >&2; }
-error() { echo "[$(ts)] [ERROR] $1" >&2; exit 1; }
+ts() { date +'%Y-%m-%d %H:%M:%S'; }
+log() { echo "[$(ts)] [INFO] $1" >&2; }
+warn() { echo "[$(ts)] [WARN] $1" >&2; }
+error() {
+	echo "[$(ts)] [ERROR] $1" >&2
+	exit 1
+}
 
 # ─── Steps ────────────────────────────────────────────────────────────────────
 validate_config() {
@@ -31,12 +34,12 @@ validate_config() {
 
 	if [ -n "$PROXY_PORT" ]; then
 		case "$PROXY_PORT" in
-			''|*[!0-9]*) error "PROXY_PORT must be a number (got: $PROXY_PORT)" ;;
+		'' | *[!0-9]*) error "PROXY_PORT must be a number (got: $PROXY_PORT)" ;;
 		esac
 		[ "$PROXY_PORT" -ge 1 ] && [ "$PROXY_PORT" -le 65535 ] || error "PROXY_PORT out of range: $PROXY_PORT"
 
-		if { [ -n "$PROXY_USER" ] && [ -z "$PROXY_PASS" ]; } || \
-		   { [ -z "$PROXY_USER" ] && [ -n "$PROXY_PASS" ]; }; then
+		if { [ -n "$PROXY_USER" ] && [ -z "$PROXY_PASS" ]; } ||
+			{ [ -z "$PROXY_USER" ] && [ -n "$PROXY_PASS" ]; }; then
 			error "Set both PROXY_USER and PROXY_PASS, or neither (open proxy)"
 		fi
 	fi
@@ -44,7 +47,7 @@ validate_config() {
 
 save_proxy_env() {
 	# Save environmental snapshot configuration for OpenVPN lifecycle script context
-	cat > /tmp/proxy-env.sh << EOF
+	cat >/tmp/proxy-env.sh <<EOF
 PROXY_PORT='${PROXY_PORT}'
 PROXY_USER='${PROXY_USER}'
 PROXY_PASS='${PROXY_PASS}'
@@ -53,8 +56,8 @@ EOF
 
 build_runtime_config() {
 	log "Preparing OpenVPN configuration..."
-	cat "$VPN_CONFIG" > "$RUNTIME_CONFIG"
-	cat >> "$RUNTIME_CONFIG" << EOF
+	cat "$VPN_CONFIG" >"$RUNTIME_CONFIG"
+	cat >>"$RUNTIME_CONFIG" <<EOF
 
 # Auto-reconnect directives
 ping-restart 120

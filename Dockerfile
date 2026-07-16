@@ -1,15 +1,29 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # BASE STAGE - Common dependencies and configurations
 # ═══════════════════════════════════════════════════════════════════════════════
-FROM docker.arvancloud.ir/alpine:3.23 AS base
+FROM docker.arvancloud.ir/debian:bookworm AS base
 
-RUN echo "http://mirror.0-1.ir/alpine/v3.23/main" > /etc/apk/repositories && \
-    echo "http://mirror.0-1.ir/alpine/v3.23/community" >> /etc/apk/repositories
+ENV TERM=xterm-256color
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apk update
-RUN apk add --no-cache bash bind-tools curl dante dante-server iptables iproute2 openvpn
+# ── Mirror setup ────────────────────────────────────────────────────────────
+RUN rm /etc/apt/sources.list.d/debian.sources
+# RUN echo "deb http://mirror.arvancloud.ir/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list
+RUN echo "deb http://repo.iut.ac.ir/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list
 
-RUN rm -rf /var/cache/apk/*
+# ── Base system update ───────────────────────────────────────────────────────
+RUN apt update && apt upgrade -y --no-install-recommends
+
+# ── Install base system requirements ─────────────────────────────────────────────────────────
+RUN apt install -y --no-install-recommends \
+    bash ca-certificates \
+    dante-client dante-server openvpn \
+    net-tools iputils-ping \
+    wget curl axel \
+    iptables nftables iproute2
+
+# ── Cleanup ──────────────────────────────────────────────────────────────────
+RUN apt clean && rm -rf /var/lib/apt/lists/*
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # VPN STAGE - OpenVpn Bootstrap

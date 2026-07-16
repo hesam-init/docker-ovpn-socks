@@ -17,10 +17,13 @@ ORIG_GW=""
 ORIG_IP=""
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
-ts()    { date +'%Y-%m-%d %H:%M:%S'; }
-log()   { echo "[$(ts)] [INFO] $1" >&2; }
-warn()  { echo "[$(ts)] [WARN] $1" >&2; }
-error() { echo "[$(ts)] [ERROR] $1" >&2; exit 1; }
+ts() { date +'%Y-%m-%d %H:%M:%S'; }
+log() { echo "[$(ts)] [INFO] $1" >&2; }
+warn() { echo "[$(ts)] [WARN] $1" >&2; }
+error() {
+	echo "[$(ts)] [ERROR] $1" >&2
+	exit 1
+}
 
 # Idempotent iptables: only appends the rule if it does not already exist
 ipt_add() {
@@ -61,8 +64,8 @@ detect_networking() {
 
 	# Parse the IP address assigned to the original interface
 	if [ -n "$ORIG_DEV" ]; then
-		ORIG_IP=$(ip -4 addr show dev "$ORIG_DEV" 2>/dev/null \
-			| awk '/inet / {split($2, a, "/"); print a[1]; exit}')
+		ORIG_IP=$(ip -4 addr show dev "$ORIG_DEV" 2>/dev/null |
+			awk '/inet / {split($2, a, "/"); print a[1]; exit}')
 	fi
 
 	# Log the detected configuration for debugging/transparency
@@ -75,7 +78,7 @@ detect_networking() {
 setup_nat() {
 	log "Checking NAT & forwarding rules..."
 	local changed=0
-	
+
 	ipt_add nat POSTROUTING -o tun0 -j MASQUERADE && changed=1
 	ipt_add filter FORWARD -i eth+ -o tun0 -j ACCEPT && changed=1
 	ipt_add filter FORWARD -i tun0 -o eth+ -m state --state RELATED,ESTABLISHED -j ACCEPT && changed=1
@@ -112,8 +115,8 @@ setup_lan_bypass() {
 	fi
 
 	log "Applying VPN bypass routes for RFC-1918 networks..."
-	ip route replace 10.0.0.0/8     via "$ORIG_GW" dev "$ORIG_DEV"
-	ip route replace 172.16.0.0/12  via "$ORIG_GW" dev "$ORIG_DEV"
+	ip route replace 10.0.0.0/8 via "$ORIG_GW" dev "$ORIG_DEV"
+	ip route replace 172.16.0.0/12 via "$ORIG_GW" dev "$ORIG_DEV"
 	ip route replace 192.168.0.0/16 via "$ORIG_GW" dev "$ORIG_DEV"
 }
 
@@ -123,7 +126,7 @@ setup_dante() {
 		return 0
 	fi
 
-	if pgrep sockd >/dev/null 2>&1; then
+	if pgrep danted >/dev/null 2>&1; then
 		log "Dante SOCKS5 proxy already running"
 		return 0
 	fi
@@ -140,7 +143,7 @@ setup_dante() {
 		auth_desc="(auth: $PROXY_USER / ***)"
 	fi
 
-	cat > /tmp/sockd.conf <<EOF
+	cat >/tmp/sockd.conf <<EOF
 logoutput: stderr
 internal: 0.0.0.0 port = ${PROXY_PORT}
 external: tun0
@@ -161,7 +164,7 @@ socks pass {
 }
 EOF
 
-	sockd -D -f /tmp/sockd.conf
+	danted -D -f /tmp/sockd.conf
 	log "Dante SOCKS5 proxy started on :${PROXY_PORT} ${auth_desc}"
 }
 

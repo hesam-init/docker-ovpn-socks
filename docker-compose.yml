@@ -6,7 +6,7 @@ services:
     container_name: vpnbaz
     environment:
       - PROXY_PORT=1080
-      - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn
+      - VPN_CONFIG=/etc/openvpn/Smart17MTN-nl.ovpn
     ports:
       - "1080:1080"
     volumes:
@@ -20,7 +20,7 @@ services:
     container_name: vpnbaz2
     environment:
       - PROXY_PORT=1080
-      - VPN_CONFIG=/etc/openvpn/Smart9MTN-nl.ovpn
+      - VPN_CONFIG=/etc/openvpn/nl10-typ1.ovpn
     ports:
       - "1081:1080"
     volumes:
