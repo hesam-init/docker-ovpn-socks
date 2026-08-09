@@ -6,23 +6,9 @@ services:
     container_name: vpnbaz
     environment:
       - PROXY_PORT=1080
-      - VPN_CONFIG=/etc/openvpn/Smart17MTN-nl.ovpn
+      - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn
     ports:
       - "1080:1080"
-    volumes:
-      - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
-      # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
-
-  vpnbaz2-socks:
-    extends:
-      file: docker-compose.base.yml
-      service: vpn-template
-    container_name: vpnbaz2
-    environment:
-      - PROXY_PORT=1080
-      - VPN_CONFIG=/etc/openvpn/nl10-typ1.ovpn
-    ports:
-      - "1081:1080"
     volumes:
       - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
       # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
