@@ -60,16 +60,12 @@ build_runtime_config() {
 	cat >>"$RUNTIME_CONFIG" <<EOF
 
 # Auto-reconnect directives
-ping-restart 120
 persist-key
 persist-tun
 resolv-retry infinite
+ping-restart 120
 connect-retry 5
 connect-retry-max 10
-
-route-delay 5
-route-nopull
-redirect-gateway def1 bypass-dhcp
 
 mute-replay-warnings
 
