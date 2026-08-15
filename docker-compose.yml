@@ -12,3 +12,16 @@ services:
     volumes:
       - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
       # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
+
+  vpnbaz2-socks:
+    extends:
+      file: docker-compose.base.yml
+      service: vpn-template
+    container_name: vpnbaz2
+    environment:
+      - PROXY_PORT=1080
+      - VPN_CONFIG=/etc/openvpn/nl1-typ2.ovpn
+    ports:
+      - "1081:1080"
+    volumes:
+      - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
