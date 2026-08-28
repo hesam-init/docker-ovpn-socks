@@ -1,23 +1,23 @@
 # Docker VPN SOCKS Router
 
-A lightweight, containerized solution for running OpenVPN clients with embedded SOCKS5 proxies. Each VPN container runs its own Dante SOCKS5 server bound directly to the VPN tunnel interface (`tun0`), so clients route traffic through a specific VPN by choosing its port.
+A lightweight, containerized solution for running **OpenVPN** and **OpenConnect / AnyConnect** VPN clients with embedded SOCKS5 proxies. Each VPN container runs its own Dante SOCKS5 server bound directly to the VPN tunnel interface (`tun0`), so clients route traffic through a specific VPN by choosing its port.
 
 ## Architecture
 
 ```
-Client → SOCKS5 Port 1080 → VPN Container (Dante on tun0) → OpenVPN Tunnel → Internet (VPN IP)
-Client → SOCKS5 Port 1081 → VPN Container (Dante on tun0) → OpenVPN Tunnel → Internet (VPN IP)
+Client → SOCKS5 Port 1080 → OpenVPN Container (Dante on tun0) → OpenVPN Tunnel → Internet
+Client → SOCKS5 Port 1082 → OpenConnect Container (Dante on tun0) → OpenConnect Tunnel → Internet
 ```
 
-Each container is self-contained: one OpenVPN process + one Dante daemon, no separate proxy container.
+Each container is self-contained: one VPN client process (OpenVPN or OpenConnect) + one Dante daemon, no separate proxy container.
 
 ### Network Flow
 
 ```
 Application
-    ↓ (SOCKS5 request to port 1080)
+    ↓ (SOCKS5 request to port 1080 / 1082)
 VPN Container (Dante)
-    ↓ (bound to tun0, exits via OpenVPN tunnel)
+    ↓ (bound to tun0, exits via VPN tunnel)
 iptables MASQUERADE on tun0
     ↓
 Internet (with VPN IP)
@@ -25,38 +25,41 @@ Internet (with VPN IP)
 
 ## Features
 
+- **Multi-Protocol Support**: Run **OpenVPN** or **OpenConnect / AnyConnect** containers
 - **Self-contained containers**: Each VPN container runs its own embedded Dante SOCKS5 server
 - **Multiple VPN support**: Run multiple VPN containers on different ports simultaneously
+- **Flexible Auth**: Supply credentials via environment variables (`VPN_USER`/`VPN_PASSWORD`) or files (`auth.txt`)
+- **Untrusted Cert Auto-Acceptance**: Automatic handling of untrusted/self-signed OpenConnect certificates (`VPN_AUTO_ACCEPT_CERT=true`)
 - **Optional SOCKS5 auth**: Set `PROXY_USER`/`PROXY_PASS` for username auth, or leave unset for open proxy
 - **Policy-based routing**: Asymmetric routing fix via a dedicated routing table (table 128)
 - **LAN bypass**: Local subnets (`10/8`, `172.16/12`, `192.168/16`) never go through the VPN tunnel
 - **Macvlan support**: Assign real LAN IPs to containers for direct LAN access without port-forwarding
-- **Alpine Linux**: Minimal image size (~50MB per container)
 - **Easy to scale**: Add more VPN connections by duplicating service blocks
 
 ## Prerequisites
 
 - Docker and Docker Compose
-- OpenVPN configuration files (`.ovpn`)
-- VPN credentials (`auth.txt` with username on line 1, password on line 2)
+- OpenVPN configuration files (`.ovpn`) OR OpenConnect server address (e.g., `TCI.apibaz.org`)
+- VPN credentials (via environment variables or `auth.txt`)
 
 ## Directory Structure
 
 ```
 docker-ovpn-socks/
-├── Dockerfile                     # Multi-stage: base (Alpine) + vpn
-├── docker-compose.yml             # Simple single-VPN deployment
-├── docker-compose.base.yml        # Reusable vpn-template service definition
+├── Dockerfile                     # Multi-stage: base (Debian) + ovpn + openconnect
+├── docker-compose.yml             # Simple multi-protocol deployment
+├── docker-compose.base.yml        # Reusable ovpn-template & openconnect-template
 ├── docker-compose.bridge.yml      # Multi-VPN with macvlan LAN IPs
-├── docker-compose.test.yml        # Test environment (no credentials required)
+├── docker-compose.test.yml        # Test environment
 ├── scripts/
-│   ├── vpn-bootstrap.sh           # Container entrypoint: validates config, starts OpenVPN
-│   └── vpn-nat.sh                 # OpenVPN `up` hook: configures NAT, routing, and Dante
+│   ├── ovpn-bootstrap.sh          # OpenVPN entrypoint
+│   ├── openconnect-bootstrap.sh   # OpenConnect entrypoint
+│   ├── vpnc-wrapper.sh            # OpenConnect vpnc event hook wrapper
+│   └── _vpn-nat.sh                # Tunnel hook: configures NAT, routing, and Dante
 ├── configs/
-│   ├── ovpn-vpnbaz/               # VPNBaz provider configs (nl1–nl4, smart) + auth.txt
-│   ├── ovpn-eliteping/            # ElitePing provider configs (ir/de/nl/tr) + auth.txt
+│   ├── ovpn-vpnbaz/               # OpenVPN provider configs + auth.txt
+│   ├── ovpn-eliteping/            # OpenVPN provider configs + auth.txt
 │   └── shared/
-│       └── auth-example.auth.txt  # Example credentials format
 └── BRIDGE.md                      # Macvlan networking setup guide
 ```
 
@@ -128,14 +131,30 @@ curl --proxy socks5h://127.0.0.1:1080 ifconfig.me
 
 ## Environment Variables
 
+### Common / Proxy Variables
+| Variable | Default | Description |
+|---|---|---|
+| `PROXY_PORT` | _(empty)_ | Port for Dante SOCKS5 server; leave unset to disable proxy |
+| `PROXY_USER` | _(empty)_ | SOCKS5 username (requires `PROXY_PASS`) |
+| `PROXY_PASS` | _(empty)_ | SOCKS5 password (requires `PROXY_USER`) |
+| `CREDENTIALS` | `true` | Set to `false` to skip credential requirements (e.g. for certs or tests) |
+
+### OpenVPN Variables
 | Variable | Default | Description |
 |---|---|---|
 | `VPN_CONFIG` | `/etc/openvpn/config.ovpn` | Path to the `.ovpn` file inside the container |
 | `AUTH_FILE` | `/etc/openvpn/auth.txt` | Path to the credentials file |
-| `CREDENTIALS` | `true` | Set to `false` to skip auth file requirement |
-| `PROXY_PORT` | _(empty)_ | Port for Dante SOCKS5 server; leave unset to disable proxy |
-| `PROXY_USER` | _(empty)_ | SOCKS5 username (requires `PROXY_PASS`) |
-| `PROXY_PASS` | _(empty)_ | SOCKS5 password (requires `PROXY_USER`) |
+
+### OpenConnect Variables
+| Variable | Default | Description |
+|---|---|---|
+| `VPN_SERVER` | _(empty)_ | OpenConnect server hostname / IP (e.g. `TCI.apibaz.org`) |
+| `VPN_USER` | _(empty)_ | OpenConnect username (if not using auth file) |
+| `VPN_PASSWORD` | _(empty)_ | OpenConnect password (if not using auth file) |
+| `VPN_AUTH_FILE` | `/etc/openconnect/auth.txt` | Path to credentials file (Line 1: user, Line 2: pass) |
+| `VPN_AUTO_ACCEPT_CERT`| `true` | Auto-confirm untrusted/self-signed certificate prompt with `"yes"` |
+| `VPN_EXTRA_ARGS` | `--no-dtls` | Extra command-line arguments passed to `openconnect` |
+| `VPN_AUTHGROUP` | _(empty)_ | Optional authgroup dropdown selection |
 
 ## Compose Files
 

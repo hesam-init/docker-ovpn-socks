@@ -13,15 +13,17 @@ services:
       - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
       # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
 
-  # vpnbaz2-socks:
-  #   extends:
-  #     file: docker-compose.base.yml
-  #     service: ovpn-template
-  #   container_name: vpnbaz2
-  #   environment:
-  #     - PROXY_PORT=1080
-  #     - VPN_CONFIG=/etc/openvpn/nl1-typ2.ovpn
-  #   ports:
-  #     - "1081:1080"
-  #   volumes:
-  #     - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
+  tci-socks:
+    extends:
+      file: docker-compose.base.yml
+      service: openconnect-template
+    container_name: tci-socks
+    environment:
+      - PROXY_PORT=1080
+      - VPN_SERVER=TCI.apibaz.org
+      # - VPN_USER=username
+      # - VPN_PASSWORD=password
+    ports:
+      - "9090:1080"
+    volumes:
+      - ./configs/ovpn-vpnbaz/auth.txt:/etc/openconnect/auth.txt:ro,z

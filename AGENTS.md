@@ -16,17 +16,29 @@ This guide highlights non-obvious configurations, networking constraints, and ru
 
 ## 2. Bootstrapping & Runtime Flow
 
-1.  **Entrypoint (`scripts/vpn-bootstrap.sh`)**:
-    *   Runs initial safety checks on paths, configuration files, and credentials.
-    *   Generates a runtime-specific config `/tmp/config-runtime.ovpn` based on the environment options.
-    *   Appends reconnect properties (`ping-restart`, `persist-tun`, etc.) and registers the `up` hook to `/usr/local/bin/setup-nat.sh` (`scripts/vpn-nat.sh`).
+### OpenVPN Flow:
+1.  **Entrypoint (`scripts/ovpn-bootstrap.sh`)**:
+    *   Runs safety checks on paths, configuration files, and credentials.
+    *   Pre-captures original default gateway (`ORIG_GW`, `ORIG_DEV`, `ORIG_IP`) into `/tmp/proxy-env.sh`.
+    *   Generates `/tmp/config-runtime.ovpn` with reconnect options and registers `up /usr/local/bin/setup-nat.sh`.
     *   Starts OpenVPN.
-2.  **NAT & Proxy Hook (`scripts/vpn-nat.sh`)**:
+2.  **NAT & Proxy Hook (`scripts/_vpn-nat.sh`)**:
     *   Triggers *after* OpenVPN establishes the `tun0` interface.
     *   Applies `iptables` NAT masquerade rules on `tun0` and enables IP forwarding.
     *   Sets up **Policy-Based Routing (Table 128)** to handle asymmetric routing for port-forwarded replies or secondary interfaces.
     *   Applies RFC-1918 private network bypasses (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) to exit through the default host bridge instead of the VPN tunnel.
-    *   Generates `/tmp/sockd.conf` and starts the Dante SOCKS5 daemon (`sockd -D -f /tmp/sockd.conf`) in the background.
+    *   Generates `/tmp/sockd.conf` and starts the Dante SOCKS5 daemon (`danted -D -f /tmp/sockd.conf`) in the background.
+
+### OpenConnect Flow:
+1.  **Entrypoint (`scripts/openconnect-bootstrap.sh`)**:
+    *   Validates target VPN server (`VPN_SERVER` / `OPENCONNECT_SERVER`).
+    *   Resolves credentials from `AUTH_FILE` or environment variables (`VPN_USER`/`VPN_PASSWORD`).
+    *   Pre-captures original default gateway (`ORIG_GW`, `ORIG_DEV`, `ORIG_IP`) into `/tmp/proxy-env.sh`.
+    *   Starts OpenConnect targeting `tun0` with `--script=/usr/local/bin/vpnc-wrapper.sh`.
+    *   Auto-confirms untrusted SSL certificate prompts with `"yes"` when `VPN_AUTO_ACCEPT_CERT=true`.
+2.  **Hook (`scripts/vpnc-wrapper.sh` -> `scripts/_vpn-nat.sh`)**:
+    *   Executes default `vpnc-script` to configure VPN routes and DNS.
+    *   On `connect` and `reconnect` reasons, calls `/usr/local/bin/setup-nat.sh` (`scripts/_vpn-nat.sh`).
 
 ---
 
@@ -34,9 +46,13 @@ This guide highlights non-obvious configurations, networking constraints, and ru
 
 | Env Variable | Default / Expected | Behavior / Constraints |
 | :--- | :--- | :--- |
-| `CREDENTIALS` | `true` | Set to `false` to disable the `auth.txt` presence and format validations (e.g., for key/cert-based VPNs or tests). |
-| `PROXY_PORT` | `""` | The SOCKS5 proxy port. SOCKS5 daemon (`sockd`) will **not** start if this is unset/empty. |
-| `PROXY_USER` / `PROXY_PASS` | `""` | If setting authentication, both variables must be set. Leaving them empty runs SOCKS5 in open/anonymous mode. |
+| `VPN_SERVER` | `""` | Target OpenConnect VPN server (e.g. `TCI.apibaz.org`). Required for OpenConnect containers. |
+| `VPN_USER` / `VPN_PASSWORD` | `""` | OpenConnect credentials. Used if `AUTH_FILE` is not mounted. |
+| `VPN_AUTO_ACCEPT_CERT` | `true` | When `true`, automatically answers `"yes"` to untrusted certificate prompts. |
+| `VPN_EXTRA_ARGS` | `--no-dtls` | Additional command-line flags passed directly to `openconnect`. |
+| `CREDENTIALS` | `true` | Set to `false` to disable credential validations (e.g., for key/cert-based VPNs or tests). |
+| `PROXY_PORT` | `""` | The SOCKS5 proxy port. SOCKS5 daemon (`danted`) will **not** start if this is unset/empty. |
+| `PROXY_USER` / `PROXY_PASS` | `""` | If setting proxy authentication, both variables must be set. Leaving them empty runs SOCKS5 in open/anonymous mode. |
 
 ---
 
@@ -60,5 +76,5 @@ Use these exact commands when debugging a container's routing and SOCKS5 status:
     ```
 *   **Check SOCKS5 Daemon**:
     ```bash
-    docker exec <container> pgrep -a sockd
+    docker exec <container> pgrep -a danted
     ```

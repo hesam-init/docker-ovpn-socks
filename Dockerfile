@@ -17,7 +17,7 @@ RUN apt update && apt upgrade -y --no-install-recommends
 # ── Install base system requirements ─────────────────────────────────────────────────────────
 RUN apt install -y --no-install-recommends \
     bash ca-certificates \
-    dante-client dante-server openvpn \
+    dante-client dante-server openvpn openconnect vpnc-scripts \
     net-tools iputils-ping \
     wget curl axel \
     iptables nftables iproute2
@@ -33,5 +33,17 @@ FROM base AS ovpn
 COPY scripts/_vpn-nat.sh /usr/local/bin/setup-nat.sh
 COPY scripts/ovpn-bootstrap.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh /usr/local/bin/setup-nat.sh
+
+CMD ["/usr/local/bin/startup.sh"]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# OPENCONNECT STAGE - OpenConnect Bootstrap
+# ═══════════════════════════════════════════════════════════════════════════════
+FROM base AS openconnect
+
+COPY scripts/_vpn-nat.sh /usr/local/bin/setup-nat.sh
+COPY scripts/vpnc-wrapper.sh /usr/local/bin/vpnc-wrapper.sh
+COPY scripts/openconnect-bootstrap.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/startup.sh /usr/local/bin/setup-nat.sh /usr/local/bin/vpnc-wrapper.sh
 
 CMD ["/usr/local/bin/startup.sh"]

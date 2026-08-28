@@ -2,6 +2,15 @@
 set -e
 
 # ─── Configuration ────────────────────────────────────────────────────────────
+PROXY_PORT=""
+PROXY_USER=""
+PROXY_PASS=""
+
+# Network environment variables (detected dynamically at runtime or loaded from proxy-env.sh)
+ORIG_DEV=""
+ORIG_GW=""
+ORIG_IP=""
+
 # Load variables captured during container startup stage
 if [ -f /tmp/proxy-env.sh ]; then
 	. /tmp/proxy-env.sh
@@ -10,11 +19,9 @@ fi
 PROXY_PORT=${PROXY_PORT:-}
 PROXY_USER=${PROXY_USER:-}
 PROXY_PASS=${PROXY_PASS:-}
-
-# Network environment variables (detected dynamically at runtime by detect_networking)
-ORIG_DEV=""
-ORIG_GW=""
-ORIG_IP=""
+ORIG_DEV=${ORIG_DEV:-}
+ORIG_GW=${ORIG_GW:-}
+ORIG_IP=${ORIG_IP:-}
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 ts() { date +'%Y-%m-%d %H:%M:%S'; }
@@ -47,25 +54,47 @@ ip_rule_add() {
 
 # ─── Steps ────────────────────────────────────────────────────────────────────
 detect_networking() {
-	log "Detecting original default network route and interface..."
-
-	# Get the default route line (e.g. "default via 172.18.0.1 dev eth0")
-	local default_route
-	default_route=$(ip -4 route show default | head -n 1)
-
-	if [ -z "$default_route" ]; then
-		warn "No default IPv4 route detected."
-		return
+	# If pre-captured during bootstrap phase, verify and use them
+	if [ -n "$ORIG_DEV" ] && [ -n "$ORIG_GW" ] && [ -n "$ORIG_IP" ] && [ "$ORIG_DEV" != "link" ] && [ "$ORIG_DEV" != "tun0" ]; then
+		log "Using pre-captured network configuration:"
+		log "  - Interface (ORIG_DEV): $ORIG_DEV"
+		log "  - Gateway   (ORIG_GW):  $ORIG_GW"
+		log "  - IP Address(ORIG_IP):  $ORIG_IP"
+		return 0
 	fi
 
-	# Parse the gateway and device from the default route line
-	ORIG_GW=$(echo "$default_route" | awk '{print $3}')
-	ORIG_DEV=$(echo "$default_route" | awk '{print $5}')
+	log "Detecting original default network route and interface..."
 
-	# Parse the IP address assigned to the original interface
-	if [ -n "$ORIG_DEV" ]; then
+	# Look for standard default gateway via non-tun interface
+	local route_line
+	route_line=$(ip -4 route show default | grep -v 'dev tun' | grep 'via' | head -n 1)
+
+	if [ -z "$route_line" ]; then
+		route_line=$(ip -4 route show | grep -E 'dev eth[0-9]+' | grep 'via' | head -n 1)
+	fi
+
+	if [ -n "$route_line" ]; then
+		ORIG_GW=$(echo "$route_line" | sed -n 's/.*via \([0-9.]*\).*/\1/p')
+		ORIG_DEV=$(echo "$route_line" | sed -n 's/.*dev \([a-zA-Z0-9_.-]*\).*/\1/p' | awk '{print $1}')
+	fi
+
+	# Fallback interface discovery if DEV is still invalid
+	if [ -z "$ORIG_DEV" ] || [ "$ORIG_DEV" = "tun0" ] || [ "$ORIG_DEV" = "link" ]; then
+		local fallback_dev
+		fallback_dev=$(ip -4 -o addr show | awk '$2 !~ /^(lo|tun)/ {print $2; exit}')
+		if [ -n "$fallback_dev" ]; then
+			ORIG_DEV="$fallback_dev"
+		fi
+	fi
+
+	if [ -n "$ORIG_DEV" ] && [ "$ORIG_DEV" != "tun0" ] && [ "$ORIG_DEV" != "link" ]; then
 		ORIG_IP=$(ip -4 addr show dev "$ORIG_DEV" 2>/dev/null |
 			awk '/inet / {split($2, a, "/"); print a[1]; exit}')
+	fi
+
+	# Validation: Ensure ORIG_GW is a valid IPv4 address
+	if ! echo "$ORIG_GW" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+		ORIG_GW=""
 	fi
 
 	# Log the detected configuration for debugging/transparency
@@ -136,7 +165,9 @@ setup_dante() {
 
 	if [ -n "$PROXY_USER" ] && [ -n "$PROXY_PASS" ]; then
 		if ! id "$PROXY_USER" >/dev/null 2>&1; then
-			adduser -D -H -s /sbin/nologin "$PROXY_USER"
+			useradd -M -s /usr/sbin/nologin "$PROXY_USER" 2>/dev/null ||
+				adduser -D -H -s /sbin/nologin "$PROXY_USER" 2>/dev/null ||
+				adduser --disabled-password --no-create-home --shell /usr/sbin/nologin "$PROXY_USER" 2>/dev/null || true
 		fi
 		echo "$PROXY_USER:$PROXY_PASS" | chpasswd
 		socks_method="username"
