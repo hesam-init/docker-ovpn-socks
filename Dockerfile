@@ -28,10 +28,10 @@ RUN apt clean && rm -rf /var/lib/apt/lists/*
 # ═══════════════════════════════════════════════════════════════════════════════
 # VPN STAGE - OpenVpn Bootstrap
 # ═══════════════════════════════════════════════════════════════════════════════
-FROM base AS vpn
+FROM base AS ovpn
 
-COPY scripts/vpn-bootstrap.sh /usr/local/bin/startup.sh
-COPY scripts/vpn-nat.sh /usr/local/bin/setup-nat.sh
+COPY scripts/_vpn-nat.sh /usr/local/bin/setup-nat.sh
+COPY scripts/ovpn-bootstrap.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh /usr/local/bin/setup-nat.sh
 
 CMD ["/usr/local/bin/startup.sh"]

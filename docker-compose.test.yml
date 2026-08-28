@@ -2,7 +2,7 @@ services:
   vpnbaz-bridge:
     extends:
       file: docker-compose.base.yml
-      service: vpn-template
+      service: ovpn-template
     container_name: vpnbaz-bridge
     networks:
       vpn-test: {}

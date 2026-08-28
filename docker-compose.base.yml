@@ -21,14 +21,14 @@ x-stop: &stop
   stop_grace_period: 3s
 
 services:
-  vpn-template:
+  ovpn-template:
     <<: *stop-fast
     build:
       context: ${PWD}
       dockerfile: Dockerfile
-      target: vpn
+      target: ovpn
       network: host
-    image: vpn-client:latest
+    image: ovpn-client:latest
     logging: *logging-default
     restart: unless-stopped
     cap_add:
