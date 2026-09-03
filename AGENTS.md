@@ -6,8 +6,8 @@ This guide highlights non-obvious configurations, networking constraints, and ru
 
 ## 1. Build & Dependency Quirks
 
-*   **Alpine Package Mirror**: The `Dockerfile` overrides the Alpine repository to use Arvan Cloud Iran mirrors (`http://mirror.0-1.ir/alpine/...`). Keep this mirror configuration intact when updating packages or changing bases, particularly when deploying in restricted network environments.
-*   **Docker Capabilities & Sysctls**: Every container inherits network capabilities from `docker-compose.base.yml`. They **must** run with:
+*   **Debian Base Image & Package Mirrors**: The `Dockerfile` builds from `docker.arvancloud.ir/debian:bookworm` and uses Iranian Debian mirrors (`http://repo.iut.ac.ir/debian/` / `http://mirror.arvancloud.ir/debian`). Keep this mirror configuration intact when updating packages or changing dependencies, particularly when deploying in restricted network environments.
+*   **Docker Capabilities & Sysctls**: Every container inherits network capabilities from `docker-compose.base.yml` (`ovpn-template` or `openconnect-template`). They **must** run with:
     *   `cap_add: [NET_ADMIN]`
     *   `devices: [/dev/net/tun:/dev/net/tun]`
     *   `sysctls`: `net.ipv4.ip_forward=1` and `net.ipv4.conf.all.src_valid_mark=1` (required for policy routing).
