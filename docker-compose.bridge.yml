@@ -7,9 +7,10 @@ services:
     networks:
       ovpn-bridge: {}
       docker-ovpn-vlan:
-        ipv4_address: 192.168.0.110
+        ipv4_address: 192.168.0.120
     environment:
-      - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn
+      - PROXY_PORT=1080
+      - VPN_CONFIG=/etc/openvpn/Smart1MTN.ovpn
     volumes:
       - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
       # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
@@ -22,11 +23,32 @@ services:
     networks:
       ovpn-bridge: {}
       docker-ovpn-vlan:
-        ipv4_address: 192.168.0.120
+        ipv4_address: 192.168.0.130
     environment:
-      - VPN_CONFIG=/etc/openvpn/nl2.e-mix.ir.ovpn
+      - PROXY_PORT=1080
+      - VPN_CONFIG=/etc/openvpn/de2.e-mix.ir.ovpn
     volumes:
       - ./configs/ovpn-eliteping:/etc/openvpn:ro,z
+      # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
+
+  tci-bridge:
+    extends:
+      file: docker-compose.base.yml
+      service: openconnect-template
+    container_name: tci-bridge
+    networks:
+      ovpn-bridge: {}
+      docker-ovpn-vlan:
+        ipv4_address: 192.168.0.110
+    environment:
+      - PROXY_PORT=1080
+      - VPN_SERVER=mcipower1.apibaz.org
+      # - VPN_USER=username
+      # - VPN_PASSWORD=password
+    ports:
+      - "9090:1080"
+    volumes:
+      - ./configs/ovpn-vpnbaz/auth.txt:/etc/openconnect/auth.txt:ro,z
 
 networks:
   ovpn-bridge:
