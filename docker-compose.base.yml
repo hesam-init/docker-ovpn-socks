@@ -52,7 +52,7 @@ services:
           "CMD",
           "sh",
           "-c",
-          "ip link show tun0 && curl -sf --max-time 5 https://1.1.1.1 > /dev/null",
+          "ip link show tun0 && (curl -sf --max-time 5 https://1.1.1.1 > /dev/null || curl -sf --max-time 5 https://cloudflare.com/cdn-cgi/trace > /dev/null)",
         ]
       interval: 30s
       timeout: 10s
@@ -92,7 +92,7 @@ services:
           "CMD",
           "sh",
           "-c",
-          "ip link show tun0 && curl -sf --max-time 5 https://1.1.1.1 > /dev/null",
+          "ip link show tun0 && (curl -sf --max-time 5 https://1.1.1.1 > /dev/null || curl -sf --max-time 5 https://cloudflare.com/cdn-cgi/trace > /dev/null)",
         ]
       interval: 30s
       timeout: 10s
