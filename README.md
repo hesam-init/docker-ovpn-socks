@@ -123,7 +123,7 @@ docker-ovpn-socks/
 │   ├── ovpn-kart/              # Sample provider directory
 │   └── ovpn-eliteping/         # Sample provider directory
 ├── BRIDGE.md                   # Macvlan networking and host-shim guide
-└── AGENTS.md                   # Architecture constraints and runtime quirks guide
+└── CLAUDE.md                   # Claude Code guidance: architecture & runtime quirks
 ```
 
 ---
