@@ -49,7 +49,7 @@ connect-retry-max 10
 mute-replay-warnings
 
 script-security 2
-up /usr/local/bin/setup-nat.sh
+up /usr/local/bin/tunnel-up.sh
 EOF
 }
 

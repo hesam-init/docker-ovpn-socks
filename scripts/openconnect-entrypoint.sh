@@ -62,7 +62,7 @@ start_openconnect() {
 	fi
 	log "Connecting to OpenConnect VPN at $VPN_SERVER ($auth_label)..."
 
-	local -a args=(--interface=tun0 --script=/usr/local/bin/vpnc-wrapper.sh)
+	local -a args=(--interface=tun0 --script=/usr/local/bin/openconnect-hook.sh)
 	if [[ -n $RESOLVED_USER ]]; then
 		args+=("--user=$RESOLVED_USER")
 	fi

@@ -114,10 +114,11 @@ docker-ovpn-socks/
 ├── docker-compose.bridge.yml   # Multi-VPN deployment with Macvlan LAN IPs
 ├── docker-compose.test.yml     # Testing compose file for auth-free VPN configs
 ├── scripts/
-│   ├── ovpn-bootstrap.sh       # OpenVPN entrypoint & config builder
-│   ├── openconnect-bootstrap.sh# OpenConnect entrypoint & credential loader
-│   ├── vpnc-wrapper.sh         # OpenConnect vpnc event handler wrapper
-│   └── _vpn-nat.sh             # Tunnel hook: NAT masquerade, Table 128 routing, & Dante daemon
+│   ├── openvpn-entrypoint.sh     # OpenVPN entrypoint & config builder
+│   ├── openconnect-entrypoint.sh # OpenConnect entrypoint & credential loader
+│   ├── openconnect-hook.sh       # OpenConnect vpnc-script hook (wraps stock vpnc-script)
+│   ├── tunnel-up.sh              # Tunnel hook: NAT masquerade, Table 128 routing, & Dante daemon
+│   └── lib/common.sh             # Shared helpers sourced by all scripts
 ├── configs/                    # Directory for provider configs & credentials (gitignored)
 │   ├── ovpn-vpnbaz/            # Sample provider directory
 │   ├── ovpn-kart/              # Sample provider directory
@@ -527,7 +528,7 @@ docker exec -it vpnbaz pgrep -a danted
 
 #### 2. OpenConnect certificate prompt rejected
 - **Cause**: The VPN server uses a self-signed, invalid, or expired certificate.
-- **Solution**: Ensure `VPN_AUTO_ACCEPT_CERT=true` is set in the container environment. The bootstrap script automatically passes `"yes"` to the certificate trust prompt.
+- **Solution**: Ensure `VPN_AUTO_ACCEPT_CERT=true` is set in the container environment. The entrypoint script automatically passes `"yes"` to the certificate trust prompt.
 
 #### 3. Connections from LAN drop, reset, or hang
 - **Cause**: Asymmetric routing on multi-homed or macvlan interfaces.
@@ -567,12 +568,12 @@ docker exec -it vpnbaz pgrep -a danted
 ### Startup & Lifecycle Flow
 
 #### OpenVPN Lifecycle:
-1. **Entrypoint (`scripts/ovpn-bootstrap.sh`)**:
+1. **Entrypoint (`scripts/openvpn-entrypoint.sh`)**:
    - Validates configuration files, paths, and credentials.
    - Captures original default route and gateway (`ORIG_GW`, `ORIG_DEV`, `ORIG_IP`) into `/tmp/proxy-env.sh`.
-   - Generates `/tmp/config-runtime.ovpn` with auto-reconnect directives and registers `up /usr/local/bin/setup-nat.sh`.
+   - Generates `/tmp/config-runtime.ovpn` with auto-reconnect directives and registers `up /usr/local/bin/tunnel-up.sh`.
    - Launches `openvpn`.
-2. **Tunnel Hook (`scripts/_vpn-nat.sh`)**:
+2. **Tunnel Hook (`scripts/tunnel-up.sh`)**:
    - Invoked once `tun0` is established.
    - Applies `iptables` NAT masquerade on `tun0` and enables IP forwarding.
    - Applies Policy-Based Routing (Table 128) for `$ORIG_IP` via `$ORIG_GW`.
@@ -580,14 +581,14 @@ docker exec -it vpnbaz pgrep -a danted
    - Generates `/tmp/sockd.conf` and launches Dante daemon (`danted -D -f /tmp/sockd.conf`).
 
 #### OpenConnect Lifecycle:
-1. **Entrypoint (`scripts/openconnect-bootstrap.sh`)**:
+1. **Entrypoint (`scripts/openconnect-entrypoint.sh`)**:
    - Validates target server and resolves credentials (from env vars or `auth.txt`).
    - Pre-captures original default gateway (`ORIG_GW`, `ORIG_DEV`, `ORIG_IP`) into `/tmp/proxy-env.sh`.
-   - Launches `openconnect` with `--script=/usr/local/bin/vpnc-wrapper.sh`.
+   - Launches `openconnect` with `--script=/usr/local/bin/openconnect-hook.sh`.
    - Automatically answers `"yes"` to untrusted certificate prompts when `VPN_AUTO_ACCEPT_CERT=true`.
-2. **Hook (`scripts/vpnc-wrapper.sh` -> `scripts/_vpn-nat.sh`)**:
+2. **Hook (`scripts/openconnect-hook.sh` -> `scripts/tunnel-up.sh`)**:
    - Runs standard `vpnc-script` to configure routes and DNS.
-   - On `connect` and `reconnect` events, triggers `/usr/local/bin/setup-nat.sh` (`scripts/_vpn-nat.sh`) to apply NAT, Table 128 routing, and launch Dante.
+   - On `connect` and `reconnect` events, triggers `/usr/local/bin/tunnel-up.sh` to apply NAT, Table 128 routing, and launch Dante.
 
 ---
 

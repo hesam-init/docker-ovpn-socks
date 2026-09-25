@@ -1,8 +1,8 @@
 # shellcheck shell=bash
-# Shared helpers for the bootstrap, vpnc-wrapper and NAT scripts.
+# Shared helpers for the entrypoint, openconnect-hook and tunnel-up scripts.
 # Installed as /usr/local/lib/vpn-socks/common.sh and sourced, never executed.
 
-# State handed from startup.sh to setup-nat.sh (they run in separate processes)
+# State handed from the entrypoint to tunnel-up.sh (they run in separate processes)
 PROXY_ENV_FILE=/tmp/proxy-env.sh
 
 # Original (pre-VPN) default route

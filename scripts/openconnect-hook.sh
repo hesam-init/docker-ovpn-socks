@@ -21,8 +21,8 @@ fi
 # When connection is established or re-established, trigger NAT & SOCKS5 setup
 case "${reason:-}" in
 connect | reconnect)
-	if [[ -x /usr/local/bin/setup-nat.sh ]]; then
-		/usr/local/bin/setup-nat.sh || true
+	if [[ -x /usr/local/bin/tunnel-up.sh ]]; then
+		/usr/local/bin/tunnel-up.sh || true
 	fi
 	;;
 esac

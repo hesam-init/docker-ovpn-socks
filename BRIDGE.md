@@ -197,7 +197,7 @@ When a container connects to both a bridge network (`eth0`), a macvlan network (
 5. The client never receives a SYN-ACK, causing connections to hang or reset.
 
 ### The Table 128 Solution
-The container bootstrapping scripts (`scripts/_vpn-nat.sh`) configure dedicated policy routing:
+The tunnel-up hook (`scripts/tunnel-up.sh`) configure dedicated policy routing:
 
 ```bash
 # Route packets with source IP = container's LAN IP via table 128

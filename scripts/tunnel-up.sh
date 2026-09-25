@@ -5,7 +5,7 @@ set -Eeuo pipefail
 source /usr/local/lib/vpn-socks/common.sh
 
 # ─── Configuration ────────────────────────────────────────────────────────────
-# Only values captured by startup.sh count, not the inherited environment
+# Only values captured by the entrypoint count, not the inherited environment
 PROXY_PORT=""
 PROXY_USER=""
 PROXY_PASS=""
@@ -33,7 +33,7 @@ ip_rule_add() {
 
 # ─── Steps ────────────────────────────────────────────────────────────────────
 detect_networking() {
-	# If pre-captured during bootstrap phase, verify and use them
+	# If pre-captured during the entrypoint phase, verify and use them
 	if is_orig_dev "$ORIG_DEV" && [[ -n $ORIG_GW && -n $ORIG_IP ]]; then
 		log "Using pre-captured network configuration:"
 		log "  - Interface (ORIG_DEV): $ORIG_DEV"

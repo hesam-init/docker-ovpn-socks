@@ -28,27 +28,27 @@ curl --proxy socks5h://127.0.0.1:<port> ifconfig.me   # socks5h = remote DNS, no
 
 ## Architecture (spans several files)
 
-**Image layout**: `Dockerfile` has a `base` stage and two targets, `ovpn` and `openconnect`. Scripts are renamed when copied into the image, so the in-container paths differ from the repo paths:
+**Image layout**: `Dockerfile` has a `base` stage and two targets, `ovpn` and `openconnect`. Each script keeps its repo basename in the image:
 - `scripts/lib/common.sh` → `/usr/local/lib/vpn-socks/common.sh` (sourced by every script: logging, `validate_proxy_env`, `capture_orig_route`, `save_proxy_env`/`load_proxy_env`)
-- `scripts/_vpn-nat.sh` → `/usr/local/bin/setup-nat.sh` (shared by both targets)
-- `scripts/ovpn-bootstrap.sh` or `scripts/openconnect-bootstrap.sh` → `/usr/local/bin/startup.sh` (CMD)
-- `scripts/vpnc-wrapper.sh` → `/usr/local/bin/vpnc-wrapper.sh` (openconnect only)
+- `scripts/tunnel-up.sh` → `/usr/local/bin/tunnel-up.sh` (shared by both targets)
+- `scripts/openvpn-entrypoint.sh` or `scripts/openconnect-entrypoint.sh` → `/usr/local/bin/` under the same name (CMD of the `ovpn` or `openconnect` target)
+- `scripts/openconnect-hook.sh` → `/usr/local/bin/openconnect-hook.sh` (openconnect only)
 
 **Compose layout**: `docker-compose.base.yml` defines `ovpn-template` and `openconnect-template`. These set caps, devices, sysctls, the healthcheck, SIGKILL stop, and the `TZ`, `VPN_AUTO_ACCEPT_CERT` and `VPN_EXTRA_ARGS` defaults. Every real service `extends:` one of them. `docker-compose.yml` uses host port mappings. `docker-compose.bridge.yml` adds macvlan LAN IPs through the external network `docker-ovpn-vlan`, which must be created first (see `BRIDGE.md`). Keep the bridge and main compose files in sync on server/config choices. `docker-compose.test.yml` uses `CREDENTIALS=false`.
 
-**Runtime flow**: the bootstrap and the hook run in separate processes, so they share state through `/tmp/proxy-env.sh`.
-1. `startup.sh` validates the env (config file, credentials, `PROXY_PORT` range, PROXY_USER/PASS both-or-neither). It then captures the pre-VPN default route as `ORIG_GW`, `ORIG_DEV` and `ORIG_IP`, and writes them with the proxy vars to `/tmp/proxy-env.sh`. The capture has to happen before the VPN rewrites routes.
-2. For OpenVPN, it writes `/tmp/config-runtime.ovpn` (user config + reconnect directives + `script-security 2` / `up /usr/local/bin/setup-nat.sh`) and then `exec`s openvpn. For OpenConnect, it loops forever and respawns `openconnect --interface=tun0 --script=vpnc-wrapper.sh`. When `VPN_AUTO_ACCEPT_CERT=true` it pipes `yes\n<password>` to stdin, which answers the cert prompt and then the password prompt.
-3. `vpnc-wrapper.sh` runs the stock `vpnc-script` and then calls `setup-nat.sh` on `reason=connect|reconnect`.
-4. `setup-nat.sh` sources `/tmp/proxy-env.sh` and falls back to re-detecting the route. It then sets up:
+**Runtime flow**: the entrypoint and the hook run in separate processes, so they share state through `/tmp/proxy-env.sh`.
+1. The entrypoint (`openvpn-entrypoint.sh` or `openconnect-entrypoint.sh`) validates the env (config file, credentials, `PROXY_PORT` range, PROXY_USER/PASS both-or-neither). It then captures the pre-VPN default route as `ORIG_GW`, `ORIG_DEV` and `ORIG_IP`, and writes them with the proxy vars to `/tmp/proxy-env.sh`. The capture has to happen before the VPN rewrites routes.
+2. For OpenVPN, it writes `/tmp/config-runtime.ovpn` (user config + reconnect directives + `script-security 2` / `up /usr/local/bin/tunnel-up.sh`) and then `exec`s openvpn. For OpenConnect, it loops forever and respawns `openconnect --interface=tun0 --script=openconnect-hook.sh`. When `VPN_AUTO_ACCEPT_CERT=true` it pipes `yes\n<password>` to stdin, which answers the cert prompt and then the password prompt.
+3. `openconnect-hook.sh` runs the stock `vpnc-script` and then calls `tunnel-up.sh` on `reason=connect|reconnect`.
+4. `tunnel-up.sh` sources `/tmp/proxy-env.sh` and falls back to re-detecting the route. It then sets up:
    - MASQUERADE and FORWARD rules on `tun0`
    - policy routing (`from $ORIG_IP` → table 128 via the original gateway), so replies to port-forwarded or macvlan-inbound connections don't go out through the tunnel
    - RFC-1918 bypass routes via the original gateway
    - `/tmp/sockd.conf`, then `danted -D` (skipped if `PROXY_PORT` is empty)
 
 **Invariants when editing scripts**:
-- `setup-nat.sh` runs again on every reconnect, so every step must stay idempotent. Use the `ipt_add` and `ip_rule_add` helpers, `ip route replace`, and the `pgrep danted` guard.
-- Scripts are `#!/usr/bin/env bash` with `set -Eeuo pipefail` (except `vpnc-wrapper.sh`, which omits `-e` so a vpnc-script failure can't block NAT setup). Read optional env vars as `${VAR:-}` because of `-u`, and guard pipelines that may legitimately match nothing with `|| true`.
+- `tunnel-up.sh` runs again on every reconnect, so every step must stay idempotent. Use the `ipt_add` and `ip_rule_add` helpers, `ip route replace`, and the `pgrep danted` guard.
+- Scripts are `#!/usr/bin/env bash` with `set -Eeuo pipefail` (except `openconnect-hook.sh`, which omits `-e` so a vpnc-script failure can't block NAT setup). Read optional env vars as `${VAR:-}` because of `-u`, and guard pipelines that may legitimately match nothing with `|| true`.
 - Shared logic lives in `lib/common.sh`; put new helpers there rather than copying them between scripts. `/tmp/proxy-env.sh` is written with `printf %q`, so keep using `save_proxy_env` instead of a hand-written heredoc.
 
 **Env var fallbacks (openconnect)**: `VPN_SERVER` falls back to `OPENCONNECT_SERVER`, then `SERVER`. `VPN_USER` and `VPN_PASSWORD` have similar alias chains. The auth file (`VPN_AUTH_FILE`, then `AUTH_FILE`, then `/etc/openconnect/auth.txt`) takes precedence over the env vars when it exists. Auth files are line 1 user, line 2 password. `CREDENTIALS=false` skips credential checks.
