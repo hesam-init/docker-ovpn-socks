@@ -30,6 +30,7 @@ RUN apt clean && rm -rf /var/lib/apt/lists/*
 # ═══════════════════════════════════════════════════════════════════════════════
 FROM base AS ovpn
 
+COPY scripts/lib/common.sh /usr/local/lib/vpn-socks/common.sh
 COPY scripts/_vpn-nat.sh /usr/local/bin/setup-nat.sh
 COPY scripts/ovpn-bootstrap.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh /usr/local/bin/setup-nat.sh
@@ -41,6 +42,7 @@ CMD ["/usr/local/bin/startup.sh"]
 # ═══════════════════════════════════════════════════════════════════════════════
 FROM base AS openconnect
 
+COPY scripts/lib/common.sh /usr/local/lib/vpn-socks/common.sh
 COPY scripts/_vpn-nat.sh /usr/local/bin/setup-nat.sh
 COPY scripts/vpnc-wrapper.sh /usr/local/bin/vpnc-wrapper.sh
 COPY scripts/openconnect-bootstrap.sh /usr/local/bin/startup.sh

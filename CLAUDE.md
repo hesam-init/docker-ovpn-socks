@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Docker images that run a VPN client (OpenVPN or OpenConnect/AnyConnect) plus an embedded Dante SOCKS5 server bound to `tun0`. There is one VPN and one proxy per container. There is no application code, only POSIX `sh` scripts in `scripts/`, a multi-stage `Dockerfile`, and compose files. There are no tests or linters. User docs are in `README.md` and macvlan/LAN-IP setup is in `BRIDGE.md`.
+Docker images that run a VPN client (OpenVPN or OpenConnect/AnyConnect) plus an embedded Dante SOCKS5 server bound to `tun0`. There is one VPN and one proxy per container. There is no application code, only bash scripts in `scripts/`, a multi-stage `Dockerfile`, and compose files. There are no tests or linters. User docs are in `README.md` and macvlan/LAN-IP setup is in `BRIDGE.md`.
 
 ## Commands
 
@@ -29,6 +29,7 @@ curl --proxy socks5h://127.0.0.1:<port> ifconfig.me   # socks5h = remote DNS, no
 ## Architecture (spans several files)
 
 **Image layout**: `Dockerfile` has a `base` stage and two targets, `ovpn` and `openconnect`. Scripts are renamed when copied into the image, so the in-container paths differ from the repo paths:
+- `scripts/lib/common.sh` → `/usr/local/lib/vpn-socks/common.sh` (sourced by every script: logging, `validate_proxy_env`, `capture_orig_route`, `save_proxy_env`/`load_proxy_env`)
 - `scripts/_vpn-nat.sh` → `/usr/local/bin/setup-nat.sh` (shared by both targets)
 - `scripts/ovpn-bootstrap.sh` or `scripts/openconnect-bootstrap.sh` → `/usr/local/bin/startup.sh` (CMD)
 - `scripts/vpnc-wrapper.sh` → `/usr/local/bin/vpnc-wrapper.sh` (openconnect only)
@@ -47,8 +48,8 @@ curl --proxy socks5h://127.0.0.1:<port> ifconfig.me   # socks5h = remote DNS, no
 
 **Invariants when editing scripts**:
 - `setup-nat.sh` runs again on every reconnect, so every step must stay idempotent. Use the `ipt_add` and `ip_rule_add` helpers, `ip route replace`, and the `pgrep danted` guard.
-- Scripts are `#!/bin/sh` with `set -e` (dash on Debian), so avoid bashisms.
-- The `ORIG_*` capture logic is duplicated across both bootstrap scripts and `_vpn-nat.sh`. Keep the copies consistent.
+- Scripts are `#!/usr/bin/env bash` with `set -Eeuo pipefail` (except `vpnc-wrapper.sh`, which omits `-e` so a vpnc-script failure can't block NAT setup). Read optional env vars as `${VAR:-}` because of `-u`, and guard pipelines that may legitimately match nothing with `|| true`.
+- Shared logic lives in `lib/common.sh`; put new helpers there rather than copying them between scripts. `/tmp/proxy-env.sh` is written with `printf %q`, so keep using `save_proxy_env` instead of a hand-written heredoc.
 
 **Env var fallbacks (openconnect)**: `VPN_SERVER` falls back to `OPENCONNECT_SERVER`, then `SERVER`. `VPN_USER` and `VPN_PASSWORD` have similar alias chains. The auth file (`VPN_AUTH_FILE`, then `AUTH_FILE`, then `/etc/openconnect/auth.txt`) takes precedence over the env vars when it exists. Auth files are line 1 user, line 2 password. `CREDENTIALS=false` skips credential checks.
 

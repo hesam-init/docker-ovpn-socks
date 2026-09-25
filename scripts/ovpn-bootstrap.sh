@@ -1,11 +1,12 @@
-#!/bin/sh
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# shellcheck source=lib/common.sh
+source /usr/local/lib/vpn-socks/common.sh
 
 # ─── Configuration ────────────────────────────────────────────────────────────
-LOG_FILE=${LOG_FILE:-/logs/$(hostname).log}
-
 CREDENTIALS=${CREDENTIALS:-true}
-RUNTIME_CONFIG="/tmp/config-runtime.ovpn"
+RUNTIME_CONFIG=/tmp/config-runtime.ovpn
 AUTH_FILE=${AUTH_FILE:-/etc/openvpn/auth.txt}
 VPN_CONFIG=${VPN_CONFIG:-/etc/openvpn/config.ovpn}
 
@@ -13,69 +14,23 @@ PROXY_PORT=${PROXY_PORT:-}
 PROXY_USER=${PROXY_USER:-}
 PROXY_PASS=${PROXY_PASS:-}
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
-ts() { date +'%Y-%m-%d %H:%M:%S'; }
-log() { echo "[$(ts)] [INFO] $1" >&2; }
-warn() { echo "[$(ts)] [WARN] $1" >&2; }
-error() {
-	echo "[$(ts)] [ERROR] $1" >&2
-	exit 1
-}
-
 # ─── Steps ────────────────────────────────────────────────────────────────────
 validate_config() {
-	cd /etc/openvpn || error "VPN config directory not found"
-	[ -f "$VPN_CONFIG" ] || error "$VPN_CONFIG not found"
+	cd /etc/openvpn || die "VPN config directory not found"
+	[[ -f $VPN_CONFIG ]] || die "$VPN_CONFIG not found"
 
-	if [ "$CREDENTIALS" = "true" ]; then
-		[ -f "$AUTH_FILE" ] || error "$AUTH_FILE not found"
-		[ "$(wc -l <"$AUTH_FILE")" -ge 1 ] || error "Invalid auth.txt: expected username and password lines"
-	fi
+	if [[ $CREDENTIALS == true ]]; then
+		[[ -f $AUTH_FILE ]] || die "$AUTH_FILE not found"
 
-	if [ -n "$PROXY_PORT" ]; then
-		case "$PROXY_PORT" in
-		'' | *[!0-9]*) error "PROXY_PORT must be a number (got: $PROXY_PORT)" ;;
-		esac
-		[ "$PROXY_PORT" -ge 1 ] && [ "$PROXY_PORT" -le 65535 ] || error "PROXY_PORT out of range: $PROXY_PORT"
-
-		if { [ -n "$PROXY_USER" ] && [ -z "$PROXY_PASS" ]; } ||
-			{ [ -z "$PROXY_USER" ] && [ -n "$PROXY_PASS" ]; }; then
-			error "Set both PROXY_USER and PROXY_PASS, or neither (open proxy)"
+		local -a lines
+		mapfile -t lines <"$AUTH_FILE"
+		local user=${lines[0]:-} pass=${lines[1]:-}
+		if [[ -z ${user//$'\r'/} || -z ${pass//$'\r'/} ]]; then
+			die "Invalid $AUTH_FILE: expected username on line 1 and password on line 2"
 		fi
 	fi
-}
 
-ORIG_DEV=""
-ORIG_GW=""
-ORIG_IP=""
-
-capture_networking() {
-	local route_line
-	route_line=$(ip -4 route show default | grep -v 'dev tun' | grep 'via' | head -n 1)
-	if [ -z "$route_line" ]; then
-		route_line=$(ip -4 route show default | head -n 1)
-	fi
-
-	if [ -n "$route_line" ]; then
-		ORIG_GW=$(echo "$route_line" | sed -n 's/.*via \([0-9.]*\).*/\1/p')
-		ORIG_DEV=$(echo "$route_line" | sed -n 's/.*dev \([a-zA-Z0-9_.-]*\).*/\1/p' | awk '{print $1}')
-		if [ -n "$ORIG_DEV" ] && [ "$ORIG_DEV" != "tun0" ] && [ "$ORIG_DEV" != "link" ]; then
-			ORIG_IP=$(ip -4 addr show dev "$ORIG_DEV" 2>/dev/null |
-				awk '/inet / {split($2, a, "/"); print a[1]; exit}')
-		fi
-	fi
-}
-
-save_proxy_env() {
-	# Save environmental snapshot configuration for OpenVPN lifecycle script context
-	cat >/tmp/proxy-env.sh <<EOF
-PROXY_PORT='${PROXY_PORT}'
-PROXY_USER='${PROXY_USER}'
-PROXY_PASS='${PROXY_PASS}'
-ORIG_DEV='${ORIG_DEV}'
-ORIG_GW='${ORIG_GW}'
-ORIG_IP='${ORIG_IP}'
-EOF
+	validate_proxy_env
 }
 
 build_runtime_config() {
@@ -99,23 +54,24 @@ EOF
 }
 
 start_openvpn() {
-	if [ -n "$PROXY_PORT" ]; then
+	if [[ -n $PROXY_PORT ]]; then
 		log "OpenVPN + Dante SOCKS5 proxy will start on :${PROXY_PORT} once tunnel is up"
 	else
 		log "OpenVPN starting (no proxy configured)"
 	fi
 
-	if [ "$CREDENTIALS" = "true" ]; then
-		exec openvpn --config "$RUNTIME_CONFIG" --auth-user-pass "$AUTH_FILE"
-	else
-		exec openvpn --config "$RUNTIME_CONFIG"
+	local -a args=(--config "$RUNTIME_CONFIG")
+	if [[ $CREDENTIALS == true ]]; then
+		args+=(--auth-user-pass "$AUTH_FILE")
 	fi
+
+	exec openvpn "${args[@]}"
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 main() {
 	validate_config
-	capture_networking
+	capture_orig_route
 	save_proxy_env
 	build_runtime_config
 	start_openvpn
