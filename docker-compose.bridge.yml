@@ -11,6 +11,8 @@ services:
     environment:
       - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/Smart1MTN.ovpn
+    ports:
+      - "1080:1080"
     volumes:
       - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
       # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
@@ -23,10 +25,12 @@ services:
     networks:
       ovpn-bridge: {}
       docker-ovpn-vlan:
-        ipv4_address: 192.168.0.130
+        ipv4_address: 192.168.0.121
     environment:
       - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/de2.e-mix.ir.ovpn
+    ports:
+      - "1081:1080"
     volumes:
       - ./configs/ovpn-eliteping:/etc/openvpn:ro,z
       # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z

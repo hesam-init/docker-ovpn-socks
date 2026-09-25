@@ -240,7 +240,7 @@ curl --proxy socks5://192.168.0.120:1080 https://ipinfo.io
 
 ## 6. Scaling & Maintenance
 
-- **Add More Containers**: Allocate another unused IP from the macvlan range (e.g. `192.168.0.121`) and add a new service block in `docker-compose.bridge.yml`.
+- **Add More Containers**: Allocate another unused IP from the macvlan range (e.g. `192.168.0.122`) and add a new service block in `docker-compose.bridge.yml`.
 - **Cleanup**:
   ```bash
   # Stop containers
