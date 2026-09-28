@@ -28,7 +28,7 @@ services:
         ipv4_address: 192.168.0.121
     environment:
       - PROXY_PORT=1080
-      - VPN_CONFIG=/etc/openvpn/de2.e-mix.ir.ovpn
+      - VPN_CONFIG=/etc/openvpn/de3.e-mix.ir.ovpn
     ports:
       - "1081:1080"
     volumes:
