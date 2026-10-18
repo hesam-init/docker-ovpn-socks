@@ -20,7 +20,7 @@ services:
     container_name: eliteping
     environment:
       - PROXY_PORT=1080
-      - VPN_CONFIG=/etc/openvpn/tcp-tr2.e-mix.ir.ovpn
+      - VPN_CONFIG=/etc/openvpn/tcp-nl2.e-mix.ir.ovpn
     ports:
       - "1081:1080"
     volumes:
