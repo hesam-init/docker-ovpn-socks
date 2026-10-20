@@ -286,6 +286,7 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 | `PROXY_PORT` | _(empty)_ | Port gost listens on for HTTP and SOCKS (e.g. `1080`). If unset, no proxy is started. |
 | `PROXY_USER` | _(empty)_ | Proxy username (requires `PROXY_PASS`). |
 | `PROXY_PASS` | _(empty)_ | Proxy password (requires `PROXY_USER`). |
+| `QUIET_GOST` | `true` | gost logs only errors (no per-connection log lines). Set to `false` for full gost logging when debugging. |
 | `CREDENTIALS` | `true` | Set to `false` to disable credential validations (e.g. for key/cert-based VPNs or tests). |
 | `TZ` | `Asia/Tehran` | Timezone inside the container. |
 | `LOG_FILE` | `/logs/<hostname>.log` | Log file location for container operations. |
@@ -577,6 +578,7 @@ docker exec -it vpnbaz pgrep -a gost
   docker logs <container> | grep -i gost
   docker exec -it <container> pgrep -a gost
   ```
+  By default (`QUIET_GOST=true`) gost logs only errors, so a quiet log is expected while it works normally. Set `QUIET_GOST=false` to see every connection.
 
 ---
 

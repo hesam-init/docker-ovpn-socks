@@ -50,7 +50,7 @@ curl --proxy http://127.0.0.1:<port> ifconfig.me      # same port also speaks HT
    - MASQUERADE and FORWARD rules on `tun0`
    - policy routing (`from $ORIG_IP` → table 128 via the original gateway), so replies to port-forwarded or macvlan-inbound connections don't go out through the tunnel
    - RFC-1918 bypass routes via the original gateway
-   - `setup_gost` (skipped if `PROXY_PORT` is empty): `gost -L "auto://[user:pass@]:PORT?interface=tun0" &`. It is backgrounded because gost has no daemon mode, and outlives the hook. Credentials are URL-encoded with `urlencode`. `interface=tun0` binds egress to the tunnel, so traffic can't leak through eth0 if the tunnel drops
+   - `setup_gost` (skipped if `PROXY_PORT` is empty): `gost -L "auto://[user:pass@]:PORT?interface=tun0" &`. It is backgrounded because gost has no daemon mode, and outlives the hook. Credentials are URL-encoded with `urlencode`. `QUIET_GOST` (default `true`, set in the entrypoints) prepends `-C '{"log":{"level":"error"}}'` (gost has no log-level flag; the inline config merges with `-L`). `interface=tun0` binds egress to the tunnel, so traffic can't leak through eth0 if the tunnel drops
 
 **Invariants when editing scripts**:
 - `tunnel-up.sh` runs again on every reconnect, so every step must stay idempotent. Use the `ipt_add` and `ip_rule_add` helpers, `ip route replace`, and the `pgrep -x gost` guard.

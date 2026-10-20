@@ -9,6 +9,7 @@ source /usr/local/lib/vpn-socks/common.sh
 PROXY_PORT=""
 PROXY_USER=""
 PROXY_PASS=""
+QUIET_GOST=""
 
 load_proxy_env
 
@@ -151,15 +152,23 @@ setup_gost() {
 
 	local auth=""
 	local auth_desc="(no auth)"
+	local -a args=()
 
 	if [[ -n $PROXY_USER && -n $PROXY_PASS ]]; then
 		auth="$(urlencode "$PROXY_USER"):$(urlencode "$PROXY_PASS")@"
 		auth_desc="(auth: $PROXY_USER / ***)"
 	fi
 
+	# gost has no log-level flag; an inline -C config merges with -L and keeps only errors.
+	if [[ $QUIET_GOST == true ]]; then
+		args+=(-C '{"log":{"level":"error"}}')
+		auth_desc+=" (quiet)"
+	fi
+
 	# auto = HTTP + SOCKS4/5 on one port; interface=tun0 keeps egress inside the tunnel.
 	# gost has no daemon mode, so it is backgrounded and outlives this hook.
-	gost -L "auto://${auth}:${PROXY_PORT}?interface=tun0" </dev/null &
+	args+=(-L "auto://${auth}:${PROXY_PORT}?interface=tun0")
+	gost "${args[@]}" </dev/null &
 	log "gost HTTP/SOCKS5 proxy started on :${PROXY_PORT} ${auth_desc}"
 }
 

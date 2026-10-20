@@ -13,6 +13,7 @@ VPN_CONFIG=${VPN_CONFIG:-/etc/openvpn/config.ovpn}
 PROXY_PORT=${PROXY_PORT:-}
 PROXY_USER=${PROXY_USER:-}
 PROXY_PASS=${PROXY_PASS:-}
+QUIET_GOST=${QUIET_GOST:-true}
 
 # ─── Steps ────────────────────────────────────────────────────────────────────
 validate_config() {

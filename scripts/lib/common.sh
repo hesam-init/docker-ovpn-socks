@@ -82,7 +82,7 @@ save_proxy_env() {
 	local v
 	(
 		umask 077
-		for v in PROXY_PORT PROXY_USER PROXY_PASS ORIG_DEV ORIG_GW ORIG_IP; do
+		for v in PROXY_PORT PROXY_USER PROXY_PASS QUIET_GOST ORIG_DEV ORIG_GW ORIG_IP; do
 			printf '%s=%q\n' "$v" "${!v}"
 		done >"$PROXY_ENV_FILE"
 	)
