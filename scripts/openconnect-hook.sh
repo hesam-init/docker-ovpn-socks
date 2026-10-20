@@ -5,11 +5,8 @@ set -uo pipefail
 # shellcheck source=lib/common.sh
 source /usr/local/lib/vpn-socks/common.sh
 
-# Locate default vpnc-script
+# Stock vpnc-script from Alpine's vpnc package
 VPNC_SCRIPT=/etc/vpnc/vpnc-script
-if [[ ! -f $VPNC_SCRIPT ]]; then
-	VPNC_SCRIPT=/usr/share/vpnc-scripts/vpnc-script
-fi
 
 if [[ -f $VPNC_SCRIPT ]]; then
 	# Execute standard vpnc network configuration as subprocess

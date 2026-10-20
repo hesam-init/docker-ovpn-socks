@@ -1,12 +1,12 @@
 # Docker VPN SOCKS Router
 
-A lightweight, containerized solution for running **OpenVPN** and **OpenConnect / Cisco AnyConnect** VPN clients with embedded **Dante SOCKS5** proxies. Each VPN container runs its own Dante server bound directly to the VPN tunnel interface (`tun0`), allowing applications and local network devices to route traffic through specific VPNs simply by selecting a port or dedicated LAN IP.
+A lightweight, containerized solution for running **OpenVPN** and **OpenConnect / Cisco AnyConnect** VPN clients with embedded **[gost](https://gost.run) HTTP + SOCKS5** proxies. Each VPN container runs its own gost proxy, which serves HTTP and SOCKS4/5 on a single port and sends all traffic out through the VPN tunnel interface (`tun0`), allowing applications and local network devices to route traffic through specific VPNs simply by selecting a port or dedicated LAN IP.
 
 ---
 
 ## Architecture
 
-Each container is self-contained: one VPN client process (OpenVPN or OpenConnect) + one Dante SOCKS5 daemon. No separate proxy container or complex inter-container proxy chaining is required.
+Each container is self-contained: one VPN client process (OpenVPN or OpenConnect) + one gost HTTP/SOCKS5 proxy. No separate proxy container or complex inter-container proxy chaining is required.
 
 ```mermaid
 flowchart TD
@@ -18,14 +18,14 @@ flowchart TD
 
     subgraph DockerHost["Docker Host"]
         subgraph OVPN["OpenVPN Container (ovpn-template)"]
-            Dante1["Dante SOCKS5 Server<br>(0.0.0.0:1080)"]
+            Gost1["gost HTTP + SOCKS5<br>(0.0.0.0:1080)"]
             NAT1["iptables MASQUERADE"]
             TUN1["tun0 Interface"]
             Table1["Routing Table 128<br>(Reply Path Fix)"]
         end
 
         subgraph OC["OpenConnect Container (openconnect-template)"]
-            Dante2["Dante SOCKS5 Server<br>(0.0.0.0:1080 -> Host 9090)"]
+            Gost2["gost HTTP + SOCKS5<br>(0.0.0.0:1080 -> Host 9090)"]
             NAT2["iptables MASQUERADE"]
             TUN2["tun0 Interface"]
             Table2["Routing Table 128<br>(Reply Path Fix)"]
@@ -38,16 +38,16 @@ flowchart TD
         Internet["Internet<br>(Masked with VPN IP)"]
     end
 
-    App1 -->|"socks5h://127.0.0.1:1080"| Dante1
-    App2 -->|"socks5h://127.0.0.1:9090"| Dante2
-    LAN -->|"socks5://192.168.0.120:1080 (macvlan)"| Dante1
+    App1 -->|"socks5h:// or http://127.0.0.1:1080"| Gost1
+    App2 -->|"socks5h:// or http://127.0.0.1:9090"| Gost2
+    LAN -->|"socks5:// or http://192.168.0.120:1080 (macvlan)"| Gost1
 
-    Dante1 --> TUN1
+    Gost1 --> TUN1
     TUN1 --> NAT1
     NAT1 --> RemoteOVPN
     RemoteOVPN --> Internet
 
-    Dante2 --> TUN2
+    Gost2 --> TUN2
     TUN2 --> NAT2
     NAT2 --> RemoteOC
     RemoteOC --> Internet
@@ -56,13 +56,13 @@ flowchart TD
 ### Network & Routing Flow
 
 ```text
-Application Request (SOCKS5)
+Application Request (HTTP or SOCKS4/5)
       │
       ▼
-Container Dante SOCKS5 Daemon (internal: 0.0.0.0 port = PROXY_PORT)
+Container gost Proxy (auto://:PROXY_PORT)
       │
       ▼
-Tunnel Interface (external: tun0)
+Tunnel Interface (gost ?interface=tun0)
       │
       ▼
 iptables NAT MASQUERADE on tun0
@@ -82,16 +82,16 @@ Internet (Egress with Remote VPN Gateway IP)
 ## Features
 
 - **Multi-Protocol Support**: Seamlessly run **OpenVPN** and **OpenConnect / Cisco AnyConnect** containers.
-- **Embedded SOCKS5 Server**: Each container runs an embedded [Dante](https://www.inet.no/dante/) SOCKS5 daemon bound directly to `tun0`.
+- **HTTP + SOCKS5 on One Port**: Each container runs an embedded [gost](https://gost.run) proxy (`auto://`) that accepts HTTP and SOCKS4/5 clients on the same port, with egress bound to `tun0` so traffic can't leak if the tunnel drops.
 - **Multi-VPN Concurrent Routing**: Run multiple VPN containers simultaneously on different host ports or dedicated LAN IPs.
 - **Flexible Authentication**: Provide credentials via environment variables (`VPN_USER`/`VPN_PASSWORD`) or mounted credential files (`auth.txt`).
 - **Untrusted Certificate Auto-Acceptance**: Automatic handling of untrusted, self-signed, or legacy OpenConnect SSL certificates (`VPN_AUTO_ACCEPT_CERT=true`).
-- **Optional SOCKS5 Proxy Authentication**: Set `PROXY_USER` and `PROXY_PASS` for authenticated access, or leave unset for open LAN proxying.
+- **Optional Proxy Authentication**: Set `PROXY_USER` and `PROXY_PASS` for authenticated access (HTTP and SOCKS5), or leave unset for open LAN proxying. Special characters are URL-encoded automatically.
 - **Policy-Based Routing (Table 128)**: Dedicated routing tables solve asymmetric routing issues when port forwarding or using multi-homed interfaces.
 - **RFC-1918 LAN Bypass**: Local subnets (`10/8`, `172.16/12`, `192.168/16`) automatically bypass the VPN tunnel.
 - **Macvlan Support**: Assign real, dedicated LAN IPs to containers for direct access from any device on your network without host port forwarding (see [BRIDGE.md](BRIDGE.md)).
 - **Integrated Docker Healthchecks**: Continual verification of `tun0` interface status and outbound reachability with automated failover and restart support.
-- **Debian Bookworm Base**: Hardened Debian multi-stage image with support for custom mirrors in restricted network environments.
+- **Alpine 3.24 Base**: Small (~117 MB) multi-stage Alpine image with support for custom mirrors in restricted network environments.
 
 ---
 
@@ -108,7 +108,8 @@ Internet (Egress with Remote VPN Gateway IP)
 
 ```text
 docker-ovpn-socks/
-├── Dockerfile                  # Multi-stage build: Debian Bookworm base + ovpn & openconnect targets
+├── Dockerfile                  # Multi-stage build: Alpine 3.24 base + gost, ovpn & openconnect targets
+├── Makefile                    # `make` / `make raw` image builds
 ├── docker-compose.base.yml     # Base service templates: ovpn-template & openconnect-template
 ├── docker-compose.yml          # Standard multi-protocol deployment (port mapping)
 ├── docker-compose.bridge.yml   # Multi-VPN deployment with Macvlan LAN IPs
@@ -117,7 +118,7 @@ docker-ovpn-socks/
 │   ├── openvpn-entrypoint.sh     # OpenVPN entrypoint & config builder
 │   ├── openconnect-entrypoint.sh # OpenConnect entrypoint & credential loader
 │   ├── openconnect-hook.sh       # OpenConnect vpnc-script hook (wraps stock vpnc-script)
-│   ├── tunnel-up.sh              # Tunnel hook: NAT masquerade, Table 128 routing, & Dante daemon
+│   ├── tunnel-up.sh              # Tunnel hook: NAT masquerade, Table 128 routing, & gost proxy
 │   └── lib/common.sh             # Shared helpers sourced by all scripts
 ├── configs/                    # Directory for provider configs & credentials (gitignored)
 │   ├── ovpn-vpnbaz/            # Sample provider directory
@@ -236,8 +237,8 @@ services:
 ### 3. Build Base Images and Start Services
 
 ```bash
-# Build base images using host networking for reliable mirror access
-docker compose -f docker-compose.base.yml build
+# Build the images (uses host networking for reliable mirror access)
+make               # or `make raw` for plain `docker build`
 
 # Start services in the background
 docker compose up -d
@@ -248,20 +249,24 @@ docker compose logs -f
 
 ---
 
-### 4. Test the SOCKS5 Proxy
+### 4. Test the Proxy
 
-Verify that external traffic is exiting through the VPN:
+Verify that external traffic is exiting through the VPN. Every proxy port accepts both HTTP and SOCKS clients:
 
 ```bash
 # Direct host connection (your real IP)
 curl ifconfig.me
 
-# Through OpenVPN SOCKS5 proxy (port 1080)
+# Through the OpenVPN proxy (port 1080), as SOCKS5 or HTTP
 curl --proxy socks5h://127.0.0.1:1080 ifconfig.me
+curl --proxy http://127.0.0.1:1080 ifconfig.me
 
-# Through OpenConnect SOCKS5 proxy (port 9090)
+# Through the OpenConnect proxy (port 9090)
 curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 ```
+
+> [!NOTE]
+> `docker compose build` does not work for these templates: Compose builds through bake, which rejects `build.network: host` unless `--allow=network.host` is passed, and Compose has no way to pass it. The Makefile runs `docker buildx bake --allow=network.host -f docker-compose.base.yml --load <targets>` instead.
 
 > [!TIP]
 > Always use `socks5h://` instead of `socks5://` in `curl` so that DNS resolution happens remotely inside the container rather than leaking through your local DNS resolver.
@@ -270,13 +275,13 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 
 ## Environment Variables Reference
 
-### Common & Dante Proxy Variables
+### Common & Proxy Variables
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `PROXY_PORT` | _(empty)_ | Port Dante listens on (e.g. `1080`). If unset, Dante daemon will not start. |
-| `PROXY_USER` | _(empty)_ | SOCKS5 proxy username (requires `PROXY_PASS`). |
-| `PROXY_PASS` | _(empty)_ | SOCKS5 proxy password (requires `PROXY_USER`). |
+| `PROXY_PORT` | _(empty)_ | Port gost listens on for HTTP and SOCKS (e.g. `1080`). If unset, no proxy is started. |
+| `PROXY_USER` | _(empty)_ | Proxy username (requires `PROXY_PASS`). |
+| `PROXY_PASS` | _(empty)_ | Proxy password (requires `PROXY_USER`). |
 | `CREDENTIALS` | `true` | Set to `false` to disable credential validations (e.g. for key/cert-based VPNs or tests). |
 | `TZ` | `Asia/Tehran` | Timezone inside the container. |
 | `LOG_FILE` | `/logs/<hostname>.log` | Log file location for container operations. |
@@ -306,10 +311,9 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 
 ### 1. `docker-compose.yml` — Multi-Protocol Deployment
 Contains standard port-forwarded VPN services:
-- `kart-socks`: OpenVPN client (container: `kart`, port mapped to host `1020:1080`)
 - `vpnbaz-socks`: OpenVPN client (container: `vpnbaz`, port mapped to host `1080:1080`)
+- `eliteping-socks`: OpenVPN client (container: `eliteping`, port mapped to host `1081:1080`)
 - `tci-socks`: OpenConnect client (container: `tci-socks`, port mapped to host `9090:1080`)
-- `tci2-socks`: OpenConnect client (container: `tci2-socks`, port mapped to host `9091:1080`)
 
 ```bash
 docker compose up -d
@@ -323,12 +327,17 @@ Defines the base service definitions inherited by other compose files via `exten
 
 Build base images:
 ```bash
-docker compose -f docker-compose.base.yml build
+make                  # ovpn-client:latest, openconnect-client:latest (via buildx bake)
+make no-cache         # same, ignoring the build cache
+make raw              # same images with plain `docker build --network host -f Dockerfile --target ovpn|openconnect`
+make raw-no-cache     # raw build, ignoring the build cache
+make ARGS=...         # extra flags are passed through
 ```
 
 ### 3. `docker-compose.bridge.yml` — Multi-VPN with Macvlan LAN IPs
 Deploys VPN containers directly onto your physical local network using Docker's macvlan driver. Each container receives a dedicated LAN IP:
 - `vpnbaz-bridge`: OpenVPN on LAN IP `192.168.0.120:1080`
+- `eliteping-bridge`: OpenVPN on LAN IP `192.168.0.121:1080`
 - `tci-bridge`: OpenConnect on LAN IP `192.168.0.110:1080` (also maps port `9090`)
 
 > [!IMPORTANT]
@@ -406,10 +415,10 @@ wget -e use_proxy=yes -e https_proxy=socks5h://127.0.0.1:1080 https://ipinfo.io
 # Git over SOCKS5
 git config --global http.proxy socks5h://127.0.0.1:1080
 
-# Environment variables for shell sessions
+# Tools that only speak HTTP proxies can use the same port
 export ALL_PROXY="socks5h://127.0.0.1:1080"
-export http_proxy="socks5h://127.0.0.1:1080"
-export https_proxy="socks5h://127.0.0.1:1080"
+export http_proxy="http://127.0.0.1:1080"
+export https_proxy="http://127.0.0.1:1080"
 ```
 
 ### Authenticated Proxy Usage
@@ -418,6 +427,7 @@ When `PROXY_USER` and `PROXY_PASS` are configured:
 
 ```bash
 curl --proxy socks5h://proxyuser:secretpass@127.0.0.1:1080 https://ipinfo.io
+curl --proxy http://proxyuser:secretpass@127.0.0.1:1080 https://ipinfo.io
 ```
 
 ### Web Browsers (Firefox)
@@ -427,6 +437,8 @@ curl --proxy socks5h://proxyuser:secretpass@127.0.0.1:1080 https://ipinfo.io
 3. Set **SOCKS Host** to `127.0.0.1` and Port to `1080` (or `9090`).
 4. Select **SOCKS v5**.
 5. Check **Proxy DNS when using SOCKS v5** to prevent DNS leaks.
+
+Alternatively, set **HTTP Proxy** to the same host and port and check **Also use this proxy for HTTPS**.
 
 ### Direct LAN Access (Macvlan)
 
@@ -481,7 +493,7 @@ docker compose restart vpnbaz
 docker compose down
 
 # Rebuild containers after Dockerfile or script changes
-docker compose -f docker-compose.base.yml build --no-cache
+make no-cache
 docker compose up -d
 
 # Shell access into a container
@@ -511,8 +523,8 @@ docker exec -it vpnbaz iptables -t nat -L -n -v
 docker exec -it vpnbaz ip rule show
 docker exec -it vpnbaz ip route show table 128
 
-# 5. Check if the Dante SOCKS5 daemon is running
-docker exec -it vpnbaz pgrep -a danted
+# 5. Check if the gost proxy is running
+docker exec -it vpnbaz pgrep -a gost
 ```
 
 ---
@@ -554,11 +566,12 @@ docker exec -it vpnbaz pgrep -a danted
   chmod 600 configs/myvpn/auth.txt
   ```
 
-#### 6. Dante daemon (`danted`) not running
+#### 6. gost proxy not running
 - **Cause**: `PROXY_PORT` was not provided in the environment, or conflicting `PROXY_USER`/`PROXY_PASS` settings.
-- **Solution**: Verify `PROXY_PORT=1080` is present. If using authentication, ensure both `PROXY_USER` and `PROXY_PASS` are defined. Check Dante log:
+- **Solution**: Verify `PROXY_PORT=1080` is present. If using authentication, ensure both `PROXY_USER` and `PROXY_PASS` are defined. gost logs to the container output, and its command line shows the listener:
   ```bash
-  docker exec -it <container> cat /tmp/sockd.conf
+  docker logs <container> | grep -i gost
+  docker exec -it <container> pgrep -a gost
   ```
 
 ---
@@ -578,7 +591,7 @@ docker exec -it vpnbaz pgrep -a danted
    - Applies `iptables` NAT masquerade on `tun0` and enables IP forwarding.
    - Applies Policy-Based Routing (Table 128) for `$ORIG_IP` via `$ORIG_GW`.
    - Adds RFC-1918 bypass routes (`10/8`, `172.16/12`, `192.168/16`).
-   - Generates `/tmp/sockd.conf` and launches Dante daemon (`danted -D -f /tmp/sockd.conf`).
+   - Launches gost in the background: `gost -L "auto://[user:pass@]:PORT?interface=tun0"`.
 
 #### OpenConnect Lifecycle:
 1. **Entrypoint (`scripts/openconnect-entrypoint.sh`)**:
@@ -588,7 +601,7 @@ docker exec -it vpnbaz pgrep -a danted
    - Automatically answers `"yes"` to untrusted certificate prompts when `VPN_AUTO_ACCEPT_CERT=true`.
 2. **Hook (`scripts/openconnect-hook.sh` -> `scripts/tunnel-up.sh`)**:
    - Runs standard `vpnc-script` to configure routes and DNS.
-   - On `connect` and `reconnect` events, triggers `/usr/local/bin/tunnel-up.sh` to apply NAT, Table 128 routing, and launch Dante.
+   - On `connect` and `reconnect` events, triggers `/usr/local/bin/tunnel-up.sh` to apply NAT, Table 128 routing, and launch gost.
 
 ---
 
@@ -605,10 +618,10 @@ docker exec -it vpnbaz pgrep -a danted
 
 ## Acknowledgments
 
-- [Dante](https://www.inet.no/dante/) - High-performance open-source SOCKS5 server
+- [gost](https://gost.run) - GO Simple Tunnel, HTTP/SOCKS proxy
 - [OpenVPN](https://openvpn.net/) - Open-source SSL/TLS VPN solution
 - [OpenConnect](https://www.infradead.org/openconnect/) - Multi-protocol VPN client for Cisco AnyConnect, Pulse, and GlobalProtect
-- [Debian GNU/Linux](https://www.debian.org/) - Robust and reliable container base OS
+- [Alpine Linux](https://alpinelinux.org/) - Small, security-oriented container base OS
 
 ---
 

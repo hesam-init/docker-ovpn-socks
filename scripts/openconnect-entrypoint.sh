@@ -49,7 +49,7 @@ validate_and_resolve_config() {
 
 start_openconnect() {
 	if [[ -n $PROXY_PORT ]]; then
-		log "OpenConnect + Dante SOCKS5 proxy will start on :${PROXY_PORT} once tunnel is up"
+		log "OpenConnect + gost HTTP/SOCKS5 proxy will start on :${PROXY_PORT} once tunnel is up"
 	else
 		log "OpenConnect starting (no proxy configured)"
 	fi

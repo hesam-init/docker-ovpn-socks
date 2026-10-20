@@ -31,6 +31,20 @@ ip_rule_add() {
 	fi
 }
 
+# Percent-encodes $1 byte-wise for use as URL userinfo
+urlencode() {
+	local LC_ALL=C
+	local s=$1 out="" c i
+	for ((i = 0; i < ${#s}; i++)); do
+		c=${s:i:1}
+		case $c in
+		[A-Za-z0-9._~-]) out+=$c ;;
+		*) printf -v c '%%%02X' "'$c" && out+=$c ;;
+		esac
+	done
+	printf '%s' "$out"
+}
+
 # ─── Steps ────────────────────────────────────────────────────────────────────
 detect_networking() {
 	# If pre-captured during the entrypoint phase, verify and use them
@@ -124,53 +138,29 @@ setup_lan_bypass() {
 	done
 }
 
-setup_dante() {
+setup_gost() {
 	if [[ -z $PROXY_PORT ]]; then
-		log "PROXY_PORT not set — skipping Dante SOCKS5 proxy"
+		log "PROXY_PORT not set — skipping gost HTTP/SOCKS5 proxy"
 		return 0
 	fi
 
-	if pgrep danted >/dev/null 2>&1; then
-		log "Dante SOCKS5 proxy already running"
+	if pgrep -x gost >/dev/null 2>&1; then
+		log "gost HTTP/SOCKS5 proxy already running"
 		return 0
 	fi
 
-	local socks_method="none"
+	local auth=""
 	local auth_desc="(no auth)"
 
 	if [[ -n $PROXY_USER && -n $PROXY_PASS ]]; then
-		if ! id "$PROXY_USER" >/dev/null 2>&1; then
-			useradd -M -s /usr/sbin/nologin "$PROXY_USER" 2>/dev/null ||
-				adduser --disabled-password --no-create-home --shell /usr/sbin/nologin "$PROXY_USER" 2>/dev/null || true
-		fi
-		printf '%s:%s\n' "$PROXY_USER" "$PROXY_PASS" | chpasswd
-		socks_method="username"
+		auth="$(urlencode "$PROXY_USER"):$(urlencode "$PROXY_PASS")@"
 		auth_desc="(auth: $PROXY_USER / ***)"
 	fi
 
-	cat >/tmp/sockd.conf <<EOF
-logoutput: stderr
-internal: 0.0.0.0 port = ${PROXY_PORT}
-external: tun0
-socksmethod: ${socks_method}
-clientmethod: none
-
-user.privileged: root
-user.unprivileged: nobody
-
-client pass {
-    from: 0.0.0.0/0 to: 0.0.0.0/0
-    log: connect disconnect error
-}
-
-socks pass {
-    from: 0.0.0.0/0 to: 0.0.0.0/0
-    log: connect disconnect error
-}
-EOF
-
-	danted -D -f /tmp/sockd.conf
-	log "Dante SOCKS5 proxy started on :${PROXY_PORT} ${auth_desc}"
+	# auto = HTTP + SOCKS4/5 on one port; interface=tun0 keeps egress inside the tunnel.
+	# gost has no daemon mode, so it is backgrounded and outlives this hook.
+	gost -L "auto://${auth}:${PROXY_PORT}?interface=tun0" </dev/null &
+	log "gost HTTP/SOCKS5 proxy started on :${PROXY_PORT} ${auth_desc}"
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -179,7 +169,7 @@ main() {
 	setup_nat
 	setup_policy_routing
 	setup_lan_bypass
-	setup_dante
+	setup_gost
 }
 
 main "$@"

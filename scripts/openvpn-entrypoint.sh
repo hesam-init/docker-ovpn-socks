@@ -55,7 +55,7 @@ EOF
 
 start_openvpn() {
 	if [[ -n $PROXY_PORT ]]; then
-		log "OpenVPN + Dante SOCKS5 proxy will start on :${PROXY_PORT} once tunnel is up"
+		log "OpenVPN + gost HTTP/SOCKS5 proxy will start on :${PROXY_PORT} once tunnel is up"
 	else
 		log "OpenVPN starting (no proxy configured)"
 	fi
