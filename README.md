@@ -89,7 +89,7 @@ Internet (Egress with Remote VPN Gateway IP)
 - **Optional Proxy Authentication**: Set `PROXY_USER` and `PROXY_PASS` for authenticated access (HTTP and SOCKS5), or leave unset for open LAN proxying. Special characters are URL-encoded automatically.
 - **Policy-Based Routing (Table 128)**: Dedicated routing tables solve asymmetric routing issues when port forwarding or using multi-homed interfaces.
 - **RFC-1918 LAN Bypass**: Local subnets (`10/8`, `172.16/12`, `192.168/16`) automatically bypass the VPN tunnel.
-- **Macvlan Support**: Assign real, dedicated LAN IPs to containers for direct access from any device on your network without host port forwarding (see [BRIDGE.md](BRIDGE.md)).
+- **Macvlan Support**: Assign real, dedicated LAN IPs to containers for direct access from any device on your network without host port forwarding (see [wiki/bridge.md](wiki/bridge.md)).
 - **Integrated Docker Healthchecks**: Continual verification of `tun0` interface status and outbound reachability with automated failover and restart support.
 - **Alpine 3.24 Base**: Small (~117 MB) multi-stage Alpine image with support for custom mirrors in restricted network environments.
 
@@ -97,7 +97,7 @@ Internet (Egress with Remote VPN Gateway IP)
 
 ## Prerequisites
 
-- Docker Engine (v20.10+) and Docker Compose (v2.0+)
+- Docker Engine (v20.10+), Docker Compose (v2.0+) and Docker Buildx (used by `make`). See the host setup guides for [Arch Linux](wiki/install-arch.md) and [Debian-based distros](wiki/install-debian.md)
 - Host Linux kernel with `/dev/net/tun` support (standard on most distributions)
 - OpenVPN configuration files (`.ovpn`) OR OpenConnect/AnyConnect server address
 - VPN credentials (username and password)
@@ -124,7 +124,11 @@ docker-ovpn-socks/
 │   ├── ovpn-vpnbaz/            # Sample provider directory
 │   ├── ovpn-kart/              # Sample provider directory
 │   └── ovpn-eliteping/         # Sample provider directory
-├── BRIDGE.md                   # Macvlan networking and host-shim guide
+├── wiki/
+│   ├── README.md               # Wiki index
+│   ├── install-arch.md         # Docker host setup on Arch Linux
+│   ├── install-debian.md       # Docker host setup on Debian/Ubuntu
+│   └── bridge.md               # Macvlan networking and host-shim guide
 └── CLAUDE.md                   # Claude Code guidance: architecture & runtime quirks
 ```
 
@@ -341,7 +345,7 @@ Deploys VPN containers directly onto your physical local network using Docker's 
 - `tci-bridge`: OpenConnect on LAN IP `192.168.0.110:1080` (also maps port `9090`)
 
 > [!IMPORTANT]
-> The `docker-ovpn-vlan` external network must be created before starting this compose file. For complete instructions and host communication setup, see [BRIDGE.md](BRIDGE.md).
+> The `docker-ovpn-vlan` external network must be created before starting this compose file. For complete instructions and host communication setup, see [wiki/bridge.md](wiki/bridge.md).
 
 ```bash
 docker compose -f docker-compose.bridge.yml up -d

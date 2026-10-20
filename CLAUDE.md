@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Docker images that run a VPN client (OpenVPN or OpenConnect/AnyConnect) plus an embedded gost proxy (HTTP + SOCKS on one port) whose egress is bound to `tun0`. There is one VPN and one proxy per container. There is no application code, only bash scripts in `scripts/`, a multi-stage Alpine `Dockerfile`, a `Makefile`, and compose files. There are no tests or linters. User docs are in `README.md` and macvlan/LAN-IP setup is in `BRIDGE.md`.
+Docker images that run a VPN client (OpenVPN or OpenConnect/AnyConnect) plus an embedded gost proxy (HTTP + SOCKS on one port) whose egress is bound to `tun0`. There is one VPN and one proxy per container. There is no application code, only bash scripts in `scripts/`, a multi-stage Alpine `Dockerfile`, a `Makefile`, and compose files. There are no tests or linters. User docs are in `README.md`. The `wiki/` folder holds the macvlan/LAN-IP setup (`wiki/bridge.md`) and the Docker host install guides (`wiki/install-arch.md`, `wiki/install-debian.md`).
 
 ## Commands
 
@@ -40,7 +40,7 @@ curl --proxy http://127.0.0.1:<port> ifconfig.me      # same port also speaks HT
 - `scripts/openvpn-entrypoint.sh` or `scripts/openconnect-entrypoint.sh` → `/usr/local/bin/` under the same name (CMD of the `ovpn` or `openconnect` target)
 - `scripts/openconnect-hook.sh` → `/usr/local/bin/openconnect-hook.sh` (openconnect only)
 
-**Compose layout**: `docker-compose.base.yml` defines `ovpn-template` and `openconnect-template`. These set caps, devices, sysctls, the healthcheck, SIGKILL stop, and the `TZ`, `VPN_AUTO_ACCEPT_CERT` and `VPN_EXTRA_ARGS` defaults. Every real service `extends:` one of them. `docker-compose.yml` uses host port mappings. `docker-compose.bridge.yml` adds macvlan LAN IPs through the external network `docker-ovpn-vlan`, which must be created first (see `BRIDGE.md`). Keep the bridge and main compose files in sync on server/config choices. `docker-compose.test.yml` uses `CREDENTIALS=false`. Images are built with the `Makefile`, not `docker compose build`.
+**Compose layout**: `docker-compose.base.yml` defines `ovpn-template` and `openconnect-template`. These set caps, devices, sysctls, the healthcheck, SIGKILL stop, and the `TZ`, `VPN_AUTO_ACCEPT_CERT` and `VPN_EXTRA_ARGS` defaults. Every real service `extends:` one of them. `docker-compose.yml` uses host port mappings. `docker-compose.bridge.yml` adds macvlan LAN IPs through the external network `docker-ovpn-vlan`, which must be created first (see `wiki/bridge.md`). Keep the bridge and main compose files in sync on server/config choices. `docker-compose.test.yml` uses `CREDENTIALS=false`. Images are built with the `Makefile`, not `docker compose build`.
 
 **Runtime flow**: the entrypoint and the hook run in separate processes, so they share state through `/tmp/proxy-env.sh`.
 1. The entrypoint (`openvpn-entrypoint.sh` or `openconnect-entrypoint.sh`) validates the env (config file, credentials, `PROXY_PORT` range, PROXY_USER/PASS both-or-neither). It then captures the pre-VPN default route as `ORIG_GW`, `ORIG_DEV` and `ORIG_IP`, and writes them with the proxy vars to `/tmp/proxy-env.sh`. The capture has to happen before the VPN rewrites routes.
