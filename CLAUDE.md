@@ -4,23 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Docker images that run a VPN client (OpenVPN or OpenConnect/AnyConnect) plus an embedded gost proxy (HTTP + SOCKS on one port) whose egress is bound to `tun0`. There is one VPN and one proxy per container. There is no application code, only bash scripts in `scripts/`, a multi-stage Alpine `Dockerfile`, a `Makefile`, and compose files. There are no tests or linters. User docs are in `README.md`. The `wiki/` folder holds the macvlan/LAN-IP setup (`wiki/bridge.md`) and the Docker host install guides (`wiki/install-arch.md`, `wiki/install-debian.md`).
+Docker images that run a VPN client (OpenVPN or OpenConnect/AnyConnect) plus an embedded gost proxy (HTTP + SOCKS on one port) whose egress is bound to `tun0`. There is one VPN and one proxy per container. There is no application code, only bash scripts in `docker/scripts/`, a multi-stage Alpine `docker/Dockerfile` (the build context is `docker/`), a `Makefile`, the main `docker-compose.yml` at the root, and the other compose files in `compose/`. There are no tests or linters. User docs are in `README.md`. The `wiki/` folder holds the macvlan/LAN-IP setup (`wiki/bridge.md`) and the Docker host install guides (`wiki/install-arch.md`, `wiki/install-debian.md`).
 
 ## Commands
 
 ```bash
 # Build ovpn-client:latest and openconnect-client:latest via the Makefile
-make                   # docker buildx bake --allow=network.host -f docker-compose.base.yml --load ovpn-template openconnect-template
-make no-cache          # same, with --no-cache
-make raw               # same images via plain `docker build --network host -f Dockerfile --target <ovpn|openconnect>`
-make raw-no-cache
+make                   # docker buildx bake --allow=network.host -f compose/docker-compose.base.yml --load ovpn-template openconnect-template
+make build-no-cache    # same, with --no-cache
+make build-raw         # same images via plain `docker build --network host -f docker/Dockerfile --target <ovpn|openconnect> docker`
+make build-raw-no-cache
+
+# Run a stack: STACK=main|bridge|test (default main) picks docker-compose.yml or compose/docker-compose.{bridge,test}.yml,
+# S="svc ..." limits up/logs to some services
+make up / down / logs / ps / config
 # `docker compose build` fails: Compose always builds through bake, which rejects the templates'
 # `build.network: host` without --allow=network.host, and Compose cannot pass that flag
 
 # Validate compose files after editing. Use `config` to check changes; do not `up` containers
-docker compose config
-docker compose -f docker-compose.bridge.yml config
-docker compose -f docker-compose.test.yml config
+make config
+make config STACK=bridge
+make config STACK=test
 
 # Debugging a running container
 docker exec <c> ip addr show tun0
@@ -34,13 +38,13 @@ curl --proxy http://127.0.0.1:<port> ifconfig.me      # same port also speaks HT
 
 ## Architecture (spans several files)
 
-**Image layout**: `Dockerfile` has an Alpine 3.24 `base` stage (bash, curl, iptables, iproute2, gost v3, openvpn, openconnect, vpnc for `/etc/vpnc/vpnc-script`) and two targets, `ovpn` and `openconnect`. Each script keeps its repo basename in the image:
+**Image layout**: `docker/Dockerfile` has an Alpine 3.24 `base` stage (bash, curl, iptables, iproute2, gost v3, openvpn, openconnect, vpnc for `/etc/vpnc/vpnc-script`) and two targets, `ovpn` and `openconnect`. Each script under `docker/scripts/` keeps its basename in the image:
 - `scripts/lib/common.sh` → `/usr/local/lib/vpn-socks/common.sh` (sourced by every script: logging, `validate_proxy_env`, `capture_orig_route`, `save_proxy_env`/`load_proxy_env`)
 - `scripts/tunnel-up.sh` → `/usr/local/bin/tunnel-up.sh` (shared by both targets)
 - `scripts/openvpn-entrypoint.sh` or `scripts/openconnect-entrypoint.sh` → `/usr/local/bin/` under the same name (CMD of the `ovpn` or `openconnect` target)
 - `scripts/openconnect-hook.sh` → `/usr/local/bin/openconnect-hook.sh` (openconnect only)
 
-**Compose layout**: `docker-compose.base.yml` defines `ovpn-template` and `openconnect-template`. These set caps, devices, sysctls, the healthcheck, SIGKILL stop, and the `TZ`, `PROXY_PORT` (`1080`), `VPN_AUTO_ACCEPT_CERT` and `VPN_EXTRA_ARGS` defaults. Every real service `extends:` one of them. `docker-compose.yml` uses host port mappings. `docker-compose.bridge.yml` adds macvlan LAN IPs through the external network `docker-ovpn-vlan`, which must be created first (see `wiki/bridge.md`). Keep the bridge and main compose files in sync on server/config choices. `docker-compose.test.yml` uses `CREDENTIALS=false`. Images are built with the `Makefile`, not `docker compose build`.
+**Compose layout**: the main `docker-compose.yml` is at the repo root; `docker-compose.base.yml`, `docker-compose.bridge.yml` and `docker-compose.test.yml` are in `compose/`. `docker-compose.base.yml` defines `ovpn-template` and `openconnect-template`. These set caps, devices, sysctls, the healthcheck, SIGKILL stop, and the `TZ`, `PROXY_PORT` (`1080`), `VPN_AUTO_ACCEPT_CERT` and `VPN_EXTRA_ARGS` defaults. Their build context is `${PWD}/docker`; the Makefile exports `PWD` as the repo root. Every real service `extends:` one of them. `docker-compose.yml` uses host port mappings. `docker-compose.bridge.yml` adds macvlan LAN IPs through the external network `docker-ovpn-vlan`, which must be created first (see `wiki/bridge.md`). Keep the bridge and main compose files in sync on server/config choices. `docker-compose.test.yml` uses `CREDENTIALS=false`. The three runnable files pin `name: docker-ovpn-socks` (otherwise the bridge/test projects would be named `compose`). Relative paths resolve against each file's own directory: the root file uses `extends.file: compose/docker-compose.base.yml` and `./configs/`, while files in `compose/` use `docker-compose.base.yml` and `../configs/`. Plain `docker compose` works for the root file; the others need `-f compose/<file>`, which the Makefile adds. Images are built with the `Makefile`, not `docker compose build`.
 
 **Runtime flow**: the entrypoint and the hook run in separate processes, so they share state through `/tmp/proxy-env.sh`.
 1. The entrypoint (`openvpn-entrypoint.sh` or `openconnect-entrypoint.sh`) validates the env (config file, credentials, `PROXY_PORT` range, PROXY_USER/PASS both-or-neither). It then captures the pre-VPN default route as `ORIG_GW`, `ORIG_DEV` and `ORIG_IP`, and writes them with the proxy vars to `/tmp/proxy-env.sh`. The capture has to happen before the VPN rewrites routes.

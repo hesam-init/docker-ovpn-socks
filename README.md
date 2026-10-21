@@ -108,18 +108,20 @@ Internet (Egress with Remote VPN Gateway IP)
 
 ```text
 docker-ovpn-socks/
-├── Dockerfile                  # Multi-stage build: Alpine 3.24 base + gost, ovpn & openconnect targets
-├── Makefile                    # `make` / `make raw` image builds
-├── docker-compose.base.yml     # Base service templates: ovpn-template & openconnect-template
+├── Makefile                    # Image builds (`make` / `make build-raw`) and stack control (`make up` / `make down`)
 ├── docker-compose.yml          # Standard multi-protocol deployment (port mapping)
-├── docker-compose.bridge.yml   # Multi-VPN deployment with Macvlan LAN IPs
-├── docker-compose.test.yml     # Testing compose file for auth-free VPN configs
-├── scripts/
-│   ├── openvpn-entrypoint.sh     # OpenVPN entrypoint & config builder
-│   ├── openconnect-entrypoint.sh # OpenConnect entrypoint & credential loader
-│   ├── openconnect-hook.sh       # OpenConnect vpnc-script hook (wraps stock vpnc-script)
-│   ├── tunnel-up.sh              # Tunnel hook: NAT masquerade, Table 128 routing, & gost proxy
-│   └── lib/common.sh             # Shared helpers sourced by all scripts
+├── docker/                     # Image source (build context)
+│   ├── Dockerfile              # Multi-stage build: Alpine 3.24 base + gost, ovpn & openconnect targets
+│   └── scripts/
+│       ├── openvpn-entrypoint.sh     # OpenVPN entrypoint & config builder
+│       ├── openconnect-entrypoint.sh # OpenConnect entrypoint & credential loader
+│       ├── openconnect-hook.sh       # OpenConnect vpnc-script hook (wraps stock vpnc-script)
+│       ├── tunnel-up.sh              # Tunnel hook: NAT masquerade, Table 128 routing, & gost proxy
+│       └── lib/common.sh             # Shared helpers sourced by all scripts
+├── compose/
+│   ├── docker-compose.base.yml     # Base service templates: ovpn-template & openconnect-template
+│   ├── docker-compose.bridge.yml   # Multi-VPN deployment with Macvlan LAN IPs
+│   └── docker-compose.test.yml     # Testing compose file for auth-free VPN configs
 ├── configs/                    # Directory for provider configs & credentials (gitignored)
 │   ├── ovpn-vpnbaz/            # Sample provider directory
 │   ├── ovpn-kart/              # Sample provider directory
@@ -171,7 +173,7 @@ cd docker-ovpn-socks
    services:
      my-ovpn-socks:
        extends:
-         file: docker-compose.base.yml
+         file: compose/docker-compose.base.yml
          service: ovpn-template
        container_name: my-ovpn-socks
        environment:
@@ -193,7 +195,7 @@ cd docker-ovpn-socks
 services:
   my-oc-socks:
     extends:
-      file: docker-compose.base.yml
+      file: compose/docker-compose.base.yml
       service: openconnect-template
     container_name: my-oc-socks
     environment:
@@ -223,7 +225,7 @@ services:
    services:
      my-oc-socks:
        extends:
-         file: docker-compose.base.yml
+         file: compose/docker-compose.base.yml
          service: openconnect-template
        container_name: my-oc-socks
        environment:
@@ -242,14 +244,17 @@ services:
 
 ```bash
 # Build the images (uses host networking for reliable mirror access)
-make               # or `make raw` for plain `docker build`
+make               # or `make build-raw` for plain `docker build`
 
-# Start services in the background
-docker compose up -d
+# Start services in the background (docker-compose.yml)
+make up               # or plain `docker compose up -d`
 
 # View live container logs
-docker compose logs -f
+make logs
 ```
+
+> [!NOTE]
+> The main `docker-compose.yml` is at the repo root, so plain `docker compose` works there. The base templates and the bridge/test stacks live in `compose/`: plain `docker compose` needs `-f compose/<file>` for those (the `make` targets add it), and their volume paths are relative to `compose/`, so they start with `../configs/`.
 
 ---
 
@@ -270,7 +275,7 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 ```
 
 > [!NOTE]
-> `docker compose build` does not work for these templates: Compose builds through bake, which rejects `build.network: host` unless `--allow=network.host` is passed, and Compose has no way to pass it. The Makefile runs `docker buildx bake --allow=network.host -f docker-compose.base.yml --load <targets>` instead.
+> `docker compose build` does not work for these templates: Compose builds through bake, which rejects `build.network: host` unless `--allow=network.host` is passed, and Compose has no way to pass it. The Makefile runs `docker buildx bake --allow=network.host -f compose/docker-compose.base.yml --load <targets>` instead.
 
 > [!TIP]
 > Always use `socks5h://` instead of `socks5://` in `curl` so that DNS resolution happens remotely inside the container rather than leaking through your local DNS resolver.
@@ -314,6 +319,17 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 
 ## Compose Files Reference
 
+The main `docker-compose.yml` is at the repo root; the base templates and the bridge/test stacks are in `compose/`. The `make` targets pick a stack with `STACK=main|bridge|test` (default `main`) and limit `up`/`logs` to some services with `S=...`:
+
+```bash
+make up               # docker compose -f docker-compose.yml up -d
+make down             # stop and remove the stack's containers
+make logs             # follow logs
+make ps               # list containers and health
+make config           # validate and print the resolved compose file
+make up STACK=bridge S=tci-bridge
+```
+
 ### 1. `docker-compose.yml` — Multi-Protocol Deployment
 Contains standard port-forwarded VPN services:
 - `vpnbaz-socks`: OpenVPN client (container: `vpnbaz`, port mapped to host `1080:1080`)
@@ -321,25 +337,25 @@ Contains standard port-forwarded VPN services:
 - `tci-socks`: OpenConnect client (container: `tci-socks`, port mapped to host `9090:1080`)
 
 ```bash
-docker compose up -d
-docker compose logs -f
+make up
+make logs
 ```
 
-### 2. `docker-compose.base.yml` — Service Templates
+### 2. `compose/docker-compose.base.yml` — Service Templates
 Defines the base service definitions inherited by other compose files via `extends`:
 - `ovpn-template`: Image `ovpn-client:latest`, `NET_ADMIN`, `/dev/net/tun`, sysctls for IP forwarding and source valid mark, ulimits, fast-stop signal (`SIGKILL`), and automated healthchecks.
 - `openconnect-template`: Image `openconnect-client:latest`, shares identical network capabilities, sysctls, and healthcheck configurations.
 
 Build base images:
 ```bash
-make                  # ovpn-client:latest, openconnect-client:latest (via buildx bake)
-make no-cache         # same, ignoring the build cache
-make raw              # same images with plain `docker build --network host -f Dockerfile --target ovpn|openconnect`
-make raw-no-cache     # raw build, ignoring the build cache
-make ARGS=...         # extra flags are passed through
+make                      # ovpn-client:latest, openconnect-client:latest (via buildx bake; same as `make build`)
+make build-no-cache       # same, ignoring the build cache
+make build-raw            # same images with plain `docker build --network host -f docker/Dockerfile --target ovpn|openconnect docker`
+make build-raw-no-cache   # raw build, ignoring the build cache
+make ARGS=...             # extra flags are passed through
 ```
 
-### 3. `docker-compose.bridge.yml` — Multi-VPN with Macvlan LAN IPs
+### 3. `compose/docker-compose.bridge.yml` — Multi-VPN with Macvlan LAN IPs
 Deploys VPN containers directly onto your physical local network using Docker's macvlan driver. Each container receives a dedicated LAN IP:
 - `vpnbaz-bridge`: OpenVPN on LAN IP `192.168.0.120:1080`
 - `eliteping-bridge`: OpenVPN on LAN IP `192.168.0.121:1080`
@@ -349,28 +365,28 @@ Deploys VPN containers directly onto your physical local network using Docker's 
 > The `docker-ovpn-vlan` external network must be created before starting this compose file. For complete instructions and host communication setup, see [wiki/bridge.md](wiki/bridge.md).
 
 ```bash
-docker compose -f docker-compose.bridge.yml up -d
+make up STACK=bridge
 ```
 
-### 4. `docker-compose.test.yml` — Authentication-Free Testing
+### 4. `compose/docker-compose.test.yml` — Authentication-Free Testing
 A lightweight test environment with `CREDENTIALS=false` for testing `.ovpn` configurations that use embedded keys/certificates or public endpoints without authentication:
 
 ```bash
-docker compose -f docker-compose.test.yml up -d
+make up STACK=test
 ```
 
 ---
 
 ## Adding More VPN Connections
 
-To add another VPN service, simply define a new block in your compose file extending the appropriate base template:
+To add another VPN service, simply define a new block in your compose file extending the appropriate base template. The examples below are for the root `docker-compose.yml`; in a file under `compose/`, use `file: docker-compose.base.yml` and `../configs/...` instead:
 
 ### Adding an OpenVPN Service:
 
 ```yaml
 vpn-nl-socks:
   extends:
-    file: docker-compose.base.yml
+    file: compose/docker-compose.base.yml
     service: ovpn-template
   container_name: vpn-nl-socks
   environment:
@@ -387,7 +403,7 @@ vpn-nl-socks:
 ```yaml
 vpn-cisco-socks:
   extends:
-    file: docker-compose.base.yml
+    file: compose/docker-compose.base.yml
     service: openconnect-template
   container_name: vpn-cisco-socks
   environment:
@@ -401,7 +417,7 @@ vpn-cisco-socks:
 
 Start the new service:
 ```bash
-docker compose up -d vpn-nl-socks vpn-cisco-socks
+make up S="vpn-nl-socks vpn-cisco-socks"
 ```
 
 ---
@@ -458,7 +474,7 @@ curl --proxy socks5://192.168.0.110:1080 https://ipinfo.io
 
 ## Healthchecks & Container Monitoring
 
-Each container inherits automated health monitoring from `docker-compose.base.yml`:
+Each container inherits automated health monitoring from `compose/docker-compose.base.yml`:
 
 ```yaml
 healthcheck:
@@ -473,7 +489,7 @@ healthcheck:
 
 ```bash
 # View container health status
-docker compose ps
+make ps
 
 # Detailed health check status and logs
 docker inspect --format='{{json .State.Health}}' vpnbaz | jq .
@@ -485,21 +501,21 @@ docker inspect --format='{{json .State.Health}}' vpnbaz | jq .
 
 ```bash
 # View live logs for all running services
-docker compose logs -f
+make logs
 
 # View logs of a specific container
 docker logs -f vpnbaz
 docker logs -f tci-socks
 
 # Restart a specific service
-docker compose restart vpnbaz
+docker compose restart vpnbaz-socks
 
 # Stop all containers
-docker compose down
+make down
 
 # Rebuild containers after Dockerfile or script changes
-make no-cache
-docker compose up -d
+make build-no-cache
+make up
 
 # Shell access into a container
 docker exec -it vpnbaz bash
@@ -587,12 +603,12 @@ docker exec -it vpnbaz pgrep -a gost
 ### Startup & Lifecycle Flow
 
 #### OpenVPN Lifecycle:
-1. **Entrypoint (`scripts/openvpn-entrypoint.sh`)**:
+1. **Entrypoint (`docker/scripts/openvpn-entrypoint.sh`)**:
    - Validates configuration files, paths, and credentials.
    - Captures original default route and gateway (`ORIG_GW`, `ORIG_DEV`, `ORIG_IP`) into `/tmp/proxy-env.sh`.
    - Generates `/tmp/config-runtime.ovpn` with auto-reconnect directives and registers `up /usr/local/bin/tunnel-up.sh`.
    - Launches `openvpn`.
-2. **Tunnel Hook (`scripts/tunnel-up.sh`)**:
+2. **Tunnel Hook (`docker/scripts/tunnel-up.sh`)**:
    - Invoked once `tun0` is established.
    - Applies `iptables` NAT masquerade on `tun0` and enables IP forwarding.
    - Applies Policy-Based Routing (Table 128) for `$ORIG_IP` via `$ORIG_GW`.
@@ -600,12 +616,12 @@ docker exec -it vpnbaz pgrep -a gost
    - Launches gost in the background: `gost -L "auto://[user:pass@]:PORT?interface=tun0"`.
 
 #### OpenConnect Lifecycle:
-1. **Entrypoint (`scripts/openconnect-entrypoint.sh`)**:
+1. **Entrypoint (`docker/scripts/openconnect-entrypoint.sh`)**:
    - Validates target server and resolves credentials (from env vars or `auth.txt`).
    - Pre-captures original default gateway (`ORIG_GW`, `ORIG_DEV`, `ORIG_IP`) into `/tmp/proxy-env.sh`.
    - Launches `openconnect` with `--script=/usr/local/bin/openconnect-hook.sh`.
    - Automatically answers `"yes"` to untrusted certificate prompts when `VPN_AUTO_ACCEPT_CERT=true`.
-2. **Hook (`scripts/openconnect-hook.sh` -> `scripts/tunnel-up.sh`)**:
+2. **Hook (`docker/scripts/openconnect-hook.sh` -> `docker/scripts/tunnel-up.sh`)**:
    - Runs standard `vpnc-script` to configure routes and DNS.
    - On `connect` and `reconnect` events, triggers `/usr/local/bin/tunnel-up.sh` to apply NAT, Table 128 routing, and launch gost.
 

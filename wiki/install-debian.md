@@ -91,7 +91,7 @@ sudo apt-get update
 sudo apt-get install -y docker.io docker-compose docker-buildx make git
 ```
 
-Here `docker-compose` and `docker-buildx` install as CLI plugins in `/usr/libexec/docker/cli-plugins/`, so `docker compose` and `docker buildx` both work. However, Buildx 0.13 has no `bake --allow` flag (it was added in Buildx 0.18), so **plain `make` fails. Build with `make raw` instead**, which builds the same images with `docker build --network host`.
+Here `docker-compose` and `docker-buildx` install as CLI plugins in `/usr/libexec/docker/cli-plugins/`, so `docker compose` and `docker buildx` both work. However, Buildx 0.13 has no `bake --allow` flag (it was added in Buildx 0.18), so **plain `make` fails. Build with `make build-raw` instead**, which builds the same images with `docker build --network host`.
 
 *Debian 12:*
 
@@ -113,7 +113,7 @@ sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 docker compose version
 ```
 
-Buildx isn't packaged for Debian 12, so **build with `make raw`**, which works with Engine 20.10's built-in builder.
+Buildx isn't packaged for Debian 12, so **build with `make build-raw`**, which works with Engine 20.10's built-in builder.
 
 > [!NOTE]
 > On Ubuntu 22.04 and older, the distro's `docker-compose` is also the legacy v1 tool. Use Option A there. Do not mix Option A and Option B packages on the same host.
@@ -183,7 +183,7 @@ docker compose version
 docker buildx version   # not available on Debian 12 main-repo installs
 ```
 
-Run a test container. On networks where Docker Hub is unreachable, pull the same mirror the project's `Dockerfile` uses:
+Run a test container. On networks where Docker Hub is unreachable, pull the same mirror the project's `docker/Dockerfile` uses:
 
 ```bash
 docker run --rm hello-world
@@ -195,8 +195,8 @@ Then build the project images from the repo root:
 
 ```bash
 cd docker-ovpn-socks
-make        # Option A, or Ubuntu 24.04+ packages
-make raw    # Debian 12/13 main-repo packages (Buildx missing or too old for bake --allow)
+make              # Option A, or Ubuntu 24.04+ packages
+make build-raw    # Debian 12/13 main-repo packages (Buildx missing or too old for bake --allow)
 ```
 
 ---
@@ -210,5 +210,5 @@ make raw    # Debian 12/13 main-repo packages (Buildx missing or too old for bak
 | `apt-get update` fails with `NO_PUBKEY` or `Signed-By` errors | The keyring path in `docker.sources` doesn't match `/etc/apt/keyrings/docker.asc`, or the key wasn't downloaded. Redo step 2 of Option A. |
 | `apt-get update` 404s on `download.docker.com` | `Suites:` is set to a derivative's codename (e.g. a Mint release name). Set it to the upstream Ubuntu/Debian codename. |
 | `docker: 'compose' is not a docker command` | Install `docker-compose-plugin` (Option A), `docker-compose-v2` (Ubuntu) or `docker-compose` (Debian 13). On Debian 12, install the Compose v2 plugin binary by hand (Option B). |
-| `make` fails with `unknown flag: --allow` or `docker: 'buildx' is not a docker command` | Buildx is missing (Debian 12) or older than 0.18 (Debian 13's 0.13.1). Use `make raw`, or switch to Option A for a current `docker-buildx-plugin`. |
+| `make` fails with `unknown flag: --allow` or `docker: 'buildx' is not a docker command` | Buildx is missing (Debian 12) or older than 0.18 (Debian 13's 0.13.1). Use `make build-raw`, or switch to Option A for a current `docker-buildx-plugin`. |
 | Container exits with `Cannot open TUN/TAP dev /dev/net/tun` | Load the `tun` module (step 4). |

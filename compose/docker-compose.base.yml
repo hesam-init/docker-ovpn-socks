@@ -48,7 +48,7 @@ services:
   ovpn-template:
     <<: *stop-fast
     build:
-      context: ${PWD}
+      context: ${PWD}/docker
       dockerfile: Dockerfile
       target: ovpn
       network: host
@@ -73,7 +73,7 @@ services:
   openconnect-template:
     <<: *stop-fast
     build:
-      context: ${PWD}
+      context: ${PWD}/docker
       dockerfile: Dockerfile
       target: openconnect
       network: host

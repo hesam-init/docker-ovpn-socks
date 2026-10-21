@@ -1,7 +1,9 @@
+name: docker-ovpn-socks
+
 services:
   vpnbaz-socks:
     extends:
-      file: docker-compose.base.yml
+      file: compose/docker-compose.base.yml
       service: ovpn-template
     container_name: vpnbaz
     environment:
@@ -14,7 +16,7 @@ services:
 
   eliteping-socks:
     extends:
-      file: docker-compose.base.yml
+      file: compose/docker-compose.base.yml
       service: ovpn-template
     container_name: eliteping
     environment:
@@ -27,7 +29,7 @@ services:
 
   tci-socks:
     extends:
-      file: docker-compose.base.yml
+      file: compose/docker-compose.base.yml
       service: openconnect-template
     container_name: tci-socks
     environment:

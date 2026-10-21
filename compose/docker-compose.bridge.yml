@@ -1,3 +1,5 @@
+name: docker-ovpn-socks
+
 services:
   vpnbaz-bridge:
     extends:
@@ -13,8 +15,8 @@ services:
     ports:
       - "1080:1080"
     volumes:
-      - ./configs/ovpn-vpnbaz:/etc/openvpn:ro,z
-      # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
+      - ../configs/ovpn-vpnbaz:/etc/openvpn:ro,z
+      # - ../configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
 
   eliteping-bridge:
     extends:
@@ -30,8 +32,8 @@ services:
     ports:
       - "1081:1080"
     volumes:
-      - ./configs/ovpn-eliteping:/etc/openvpn:ro,z
-      # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
+      - ../configs/ovpn-eliteping:/etc/openvpn:ro,z
+      # - ../configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
 
   tci-bridge:
     extends:
@@ -49,7 +51,7 @@ services:
     ports:
       - "9090:1080"
     volumes:
-      - ./configs/ovpn-vpnbaz/auth.txt:/etc/openconnect/auth.txt:ro,z
+      - ../configs/ovpn-vpnbaz/auth.txt:/etc/openconnect/auth.txt:ro,z
 
 networks:
   ovpn-bridge:
