@@ -9,7 +9,6 @@ services:
       docker-ovpn-vlan:
         ipv4_address: 192.168.0.128
     environment:
-      - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/nl3-typ2.ovpn
       - CREDENTIALS=false
     ports:

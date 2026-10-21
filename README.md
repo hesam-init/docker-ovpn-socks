@@ -283,7 +283,7 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `PROXY_PORT` | _(empty)_ | Port gost listens on for HTTP and SOCKS (e.g. `1080`). If unset, no proxy is started. |
+| `PROXY_PORT` | `1080` | Port gost listens on for HTTP and SOCKS. Set it to an empty value (`PROXY_PORT=`) to run without a proxy. |
 | `PROXY_USER` | _(empty)_ | Proxy username (requires `PROXY_PASS`). |
 | `PROXY_PASS` | _(empty)_ | Proxy password (requires `PROXY_USER`). |
 | `QUIET_GOST` | `true` | gost logs only errors (no per-connection log lines). Set to `false` for full gost logging when debugging. |
@@ -572,8 +572,8 @@ docker exec -it vpnbaz pgrep -a gost
   ```
 
 #### 6. gost proxy not running
-- **Cause**: `PROXY_PORT` was not provided in the environment, or conflicting `PROXY_USER`/`PROXY_PASS` settings.
-- **Solution**: Verify `PROXY_PORT=1080` is present. If using authentication, ensure both `PROXY_USER` and `PROXY_PASS` are defined. gost logs to the container output, and its command line shows the listener:
+- **Cause**: `PROXY_PORT` was set to an empty value (which disables the proxy), or conflicting `PROXY_USER`/`PROXY_PASS` settings.
+- **Solution**: Remove the empty `PROXY_PORT=` or set a port (the default is `1080`). If using authentication, ensure both `PROXY_USER` and `PROXY_PASS` are defined. gost logs to the container output, and its command line shows the listener:
   ```bash
   docker logs <container> | grep -i gost
   docker exec -it <container> pgrep -a gost

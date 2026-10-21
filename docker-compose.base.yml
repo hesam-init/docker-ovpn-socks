@@ -66,6 +66,7 @@ services:
       - 8.8.8.8
     environment:
       - TZ=Asia/Tehran
+      - PROXY_PORT=1080
     ulimits: *ulimits-default
     healthcheck: *healthcheck-tunnel
 
@@ -90,6 +91,7 @@ services:
       - 8.8.8.8
     environment:
       - TZ=Asia/Tehran
+      - PROXY_PORT=1080
       - VPN_AUTO_ACCEPT_CERT=true
       - VPN_EXTRA_ARGS=--no-dtls
     ulimits: *ulimits-default

@@ -9,7 +9,6 @@ services:
       docker-ovpn-vlan:
         ipv4_address: 192.168.0.120
     environment:
-      - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/Smart1MTN.ovpn
     ports:
       - "1080:1080"
@@ -27,7 +26,6 @@ services:
       docker-ovpn-vlan:
         ipv4_address: 192.168.0.121
     environment:
-      - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/de3.e-mix.ir.ovpn
     ports:
       - "1081:1080"
@@ -45,7 +43,6 @@ services:
       docker-ovpn-vlan:
         ipv4_address: 192.168.0.110
     environment:
-      - PROXY_PORT=1080
       - VPN_SERVER=mcipower1.apibaz.org
       # - VPN_USER=username
       # - VPN_PASSWORD=password

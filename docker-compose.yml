@@ -5,7 +5,6 @@ services:
       service: ovpn-template
     container_name: vpnbaz
     environment:
-      - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/Smart3MTN.ovpn
     ports:
       - "1080:1080"
@@ -19,10 +18,9 @@ services:
       service: ovpn-template
     container_name: eliteping
     environment:
-      - PROXY_PORT=1080
       - VPN_CONFIG=/etc/openvpn/tcp-de1.e-mix.ir.ovpn
     ports:
-      - "1081:1080"
+      - "3080:1080"
     volumes:
       - ./configs/ovpn-eliteping:/etc/openvpn:ro,z
       # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
@@ -33,7 +31,6 @@ services:
       service: openconnect-template
     container_name: tci-socks
     environment:
-      - PROXY_PORT=1080
       - VPN_SERVER=mcipower1.apibaz.org
       # - VPN_USER=username
       # - VPN_PASSWORD=password
