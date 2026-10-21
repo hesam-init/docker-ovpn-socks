@@ -121,7 +121,8 @@ docker-ovpn-socks/
 ├── compose/
 │   ├── docker-compose.base.yml     # Base service templates: ovpn-template & openconnect-template
 │   ├── docker-compose.bridge.yml   # Multi-VPN deployment with Macvlan LAN IPs
-│   └── docker-compose.test.yml     # Testing compose file for auth-free VPN configs
+│   ├── docker-compose.test.yml     # Testing compose file for auth-free VPN configs
+│   └── docker-compose.example.yml  # Annotated example using the ovpn/openconnect presets
 ├── configs/                    # Directory for provider configs & credentials (gitignored)
 │   ├── ovpn-vpnbaz/            # Sample provider directory
 │   ├── ovpn-kart/              # Sample provider directory
@@ -300,7 +301,7 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `VPN_CONFIG` | `/etc/openvpn/config.ovpn` | Path to the `.ovpn` configuration file inside the container. |
+| `VPN_CONFIG` | `/etc/openvpn/config.ovpn` | Path to the `.ovpn` configuration file inside the container. A bare file name (e.g. `Smart3MTN.ovpn`) is resolved relative to `/etc/openvpn`. |
 | `AUTH_FILE` | `/etc/openvpn/auth.txt` | Path to the credentials file (Line 1: username, Line 2: password). |
 
 ### OpenConnect / AnyConnect Variables
@@ -319,7 +320,7 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 
 ## Compose Files Reference
 
-The main `docker-compose.yml` is at the repo root; the base templates and the bridge/test stacks are in `compose/`. The `make` targets pick a stack with `STACK=main|bridge|test` (default `main`) and limit `up`/`logs` to some services with `S=...`:
+The main `docker-compose.yml` is at the repo root; the base templates and the bridge/test/example stacks are in `compose/`. The `make` targets pick a stack with `STACK=main|bridge|test|example` (default `main`) and limit `up`/`logs` to some services with `S=...`:
 
 ```bash
 make up               # docker compose -f docker-compose.yml up -d
@@ -374,6 +375,18 @@ A lightweight test environment with `CREDENTIALS=false` for testing `.ovpn` conf
 ```bash
 make up STACK=test
 ```
+
+### 5. `compose/docker-compose.example.yml` — Preset Example
+A starting point for new stacks. It defines two YAML presets, `x-ovpn` (OpenVPN, mounts `configs/ovpn-provider`) and `x-openconnect` (OpenConnect, mounts `configs/ovpn-provider/auth.txt`), so each service only sets its host port and `VPN_CONFIG` file name or `VPN_SERVER`:
+
+```yaml
+  ovpn-server1:
+    <<: *ovpn
+    ports: ["1080:1080"]
+    environment: VPN_CONFIG=server1.ovpn
+```
+
+A service that sets its own `volumes:` replaces the preset's mount rather than adding to it. Replace `ovpn-provider`, the `.ovpn` names and `vpn.example.com` with your own, then check it with `make config STACK=example`.
 
 ---
 

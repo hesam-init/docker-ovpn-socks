@@ -1,0 +1,52 @@
+# Example stack: copy it, rename the provider folder/servers, and set one host port per service.
+#   make config STACK=example
+#
+# Paths are relative to this file (compose/), so configs live in ../configs/.
+name: docker-ovpn-socks
+
+# OpenVPN preset: set VPN_CONFIG to a file name in configs/ovpn-provider.
+# configs/ovpn-provider/auth.txt holds the login (line 1 user, line 2 password).
+x-ovpn: &ovpn
+  extends:
+    file: docker-compose.base.yml
+    service: ovpn-template
+  volumes:
+    - ../configs/ovpn-provider:/etc/openvpn:ro,z
+
+# OpenConnect preset: set VPN_SERVER; the login comes from the same auth.txt.
+x-openconnect: &openconnect
+  extends:
+    file: docker-compose.base.yml
+    service: openconnect-template
+  volumes:
+    - ../configs/ovpn-provider/auth.txt:/etc/openconnect/auth.txt:ro,z
+
+services:
+  # OpenVPN: one service per .ovpn file, each on its own host port
+  ovpn-server1:
+    <<: *ovpn
+    ports: ["1080:1080"]
+    environment: VPN_CONFIG=server1.ovpn
+
+  ovpn-server2:
+    <<: *ovpn
+    ports: ["1081:1080"]
+    environment:
+      - VPN_CONFIG=server2.ovpn
+      # Optional proxy login, both or neither
+      - PROXY_USER=user
+      - PROXY_PASS=pass
+
+  # OpenVPN config with embedded keys and no login
+  ovpn-nologin:
+    <<: *ovpn
+    ports: ["1082:1080"]
+    environment:
+      - VPN_CONFIG=public.ovpn
+      - CREDENTIALS=false
+
+  # OpenConnect (AnyConnect)
+  openconnect-server:
+    <<: *openconnect
+    ports: ["9090:1080"]
+    environment: VPN_SERVER=vpn.example.com
