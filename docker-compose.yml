@@ -12,7 +12,7 @@ x-vpnbaz: &vpnbaz
 
 # openconnect preset: set VPN_SERVER; credentials come from configs/ovpn-vpnbaz/auth.txt.
 # Each service sets its own ports.
-x-openconnect: &openconnect
+x-vpnbaz-openconnect: &vpnbaz-oc
   extends:
     file: compose/docker-compose.base.yml
     service: openconnect-template
@@ -36,24 +36,13 @@ services:
     environment: VPN_CONFIG=Smart10MTN-nl.ovpn
 
   vpnbaz-openconnect-socks:
-    <<: *openconnect
+    <<: *vpnbaz-oc
     ports: ["9090:1080"]
     environment: VPN_SERVER=mcipower1.apibaz.org
 
   vpnbaz2-openconnect-socks:
-    <<: *openconnect
+    <<: *vpnbaz-oc
     ports: ["9091:1080"]
     environment: 
-      - VPN_SERVER=mci6.apibaz.org
+      - VPN_SERVER=shatel1.apibaz.org:110
       - VPN_OS=android
-
-  eliteping-socks:
-    extends:
-      file: compose/docker-compose.base.yml
-      service: ovpn-template
-    container_name: eliteping
-    environment: VPN_CONFIG=/etc/openvpn/tcp-de1.e-mix.ir.ovpn
-    ports: ["3080:1080"]
-    volumes:
-      - ./configs/ovpn-eliteping:/etc/openvpn:ro,z
-      # - ./configs/shared/vpnbaz.auth:/etc/openvpn/auth.txt:ro,z
