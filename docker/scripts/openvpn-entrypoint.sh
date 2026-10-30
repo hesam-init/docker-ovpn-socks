@@ -61,6 +61,9 @@ start_openvpn() {
 		log "OpenVPN starting (no proxy configured)"
 	fi
 
+	# OpenVPN sends its build platform as IV_PLAT; it can't be overridden
+	log "Connecting to OpenVPN server (reported OS: linux)..."
+
 	local -a args=(--config "$RUNTIME_CONFIG")
 	if [[ $CREDENTIALS == true ]]; then
 		args+=(--auth-user-pass "$AUTH_FILE")
