@@ -35,6 +35,18 @@ services:
     ports: ["1082:1080"]
     environment: VPN_CONFIG=Smart10MTN-nl.ovpn
 
+  vpnbaz-openconnect-socks:
+    <<: *openconnect
+    ports: ["9090:1080"]
+    environment: VPN_SERVER=mcipower1.apibaz.org
+
+  vpnbaz2-openconnect-socks:
+    <<: *openconnect
+    ports: ["9091:1080"]
+    environment: 
+      - VPN_SERVER=mci6.apibaz.org
+      - VPN_OS=android
+
   eliteping-socks:
     extends:
       file: compose/docker-compose.base.yml
