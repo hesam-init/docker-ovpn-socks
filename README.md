@@ -315,6 +315,7 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 | `VPN_AUTO_ACCEPT_CERT`| `true` | Automatically confirm untrusted/self-signed SSL certificates with `"yes"`. |
 | `VPN_EXTRA_ARGS` | `--no-dtls` | Additional command-line flags passed directly to `openconnect`. |
 | `VPN_AUTHGROUP` | _(empty)_ | Optional authgroup dropdown selection name. |
+| `VPN_OS` | _(empty, openconnect's default `linux-64`)_ | OS reported to the server (`--os`): `android`, `ios`, `linux`, `linux-64`, `win` or `mac`. Useful when the server only allows mobile clients. |
 
 ---
 

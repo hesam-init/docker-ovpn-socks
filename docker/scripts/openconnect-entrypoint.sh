@@ -14,6 +14,7 @@ VPN_PASSWORD=${VPN_PASSWORD:-${VPN_PASS:-${PASSWORD:-${PASS:-}}}}
 VPN_AUTO_ACCEPT_CERT=${VPN_AUTO_ACCEPT_CERT:-true}
 VPN_EXTRA_ARGS=${VPN_EXTRA_ARGS:---no-dtls}
 VPN_AUTHGROUP=${VPN_AUTHGROUP:-}
+VPN_OS=${VPN_OS:-}
 
 PROXY_PORT=${PROXY_PORT-1080}
 PROXY_USER=${PROXY_USER:-}
@@ -45,6 +46,18 @@ validate_and_resolve_config() {
 		die "Both username and password are required. Provide them via VPN_USER/VPN_PASSWORD env vars or in $AUTH_FILE"
 	fi
 
+	# Map friendly names to openconnect --os values
+	case ${VPN_OS,,} in
+	'') ;;
+	android) VPN_OS=android ;;
+	ios | apple-ios) VPN_OS=apple-ios ;;
+	linux) VPN_OS=linux ;;
+	linux-64) VPN_OS=linux-64 ;;
+	win | windows) VPN_OS=win ;;
+	mac | mac-intel | macos) VPN_OS=mac-intel ;;
+	*) die "Invalid VPN_OS='$VPN_OS' (expected android, ios, linux, linux-64, win or mac)" ;;
+	esac
+
 	validate_proxy_env
 }
 
@@ -70,6 +83,10 @@ start_openconnect() {
 	if [[ -n $VPN_AUTHGROUP ]]; then
 		args+=("--authgroup=$VPN_AUTHGROUP")
 	fi
+	if [[ -n $VPN_OS ]]; then
+		args+=("--os=$VPN_OS")
+	fi
+	log "Reported OS: ${VPN_OS:-linux-64}"
 	if [[ -n $VPN_EXTRA_ARGS ]]; then
 		local -a extra
 		read -ra extra <<<"$VPN_EXTRA_ARGS"
