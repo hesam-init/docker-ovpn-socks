@@ -124,6 +124,7 @@ docker-ovpn-socks/
 │   ├── docker-compose.test.yml     # Testing compose file for auth-free VPN configs
 │   └── docker-compose.example.yml  # Annotated example using the ovpn/openconnect presets
 ├── configs/                    # Directory for provider configs & credentials (gitignored)
+│   ├── FoxyProxy.json          # FoxyProxy backup with profiles for the local proxy ports
 │   ├── ovpn-vpnbaz/            # Sample provider directory
 │   ├── ovpn-kart/              # Sample provider directory
 │   └── ovpn-eliteping/         # Sample provider directory
@@ -474,6 +475,16 @@ curl --proxy http://proxyuser:secretpass@127.0.0.1:1080 https://ipinfo.io
 5. Check **Proxy DNS when using SOCKS v5** to prevent DNS leaks.
 
 Alternatively, set **HTTP Proxy** to the same host and port and check **Also use this proxy for HTTPS**.
+
+### FoxyProxy Profiles
+
+[`configs/FoxyProxy.json`](configs/FoxyProxy.json) is a ready-made FoxyProxy backup with SOCKS5 profiles (remote DNS on) for the VpnBaz ports `1080`–`1085` and the OpenConnect ports `9090`–`9095`. In FoxyProxy, open **Options** → **Import** and import it from this URL, or download it and import the file:
+
+```text
+https://raw.githubusercontent.com/hesam-init/docker-ovpn-socks/refs/heads/main/configs/FoxyProxy.json
+```
+
+Importing replaces your current FoxyProxy settings, so export a backup first.
 
 ### Direct LAN Access (Macvlan)
 
