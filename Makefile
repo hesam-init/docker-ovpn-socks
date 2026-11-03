@@ -8,6 +8,9 @@
 #   make build-raw-no-cache   raw build, ignoring the build cache
 #   make ARGS=...             pass extra flags to bake / docker build
 #
+#   Build mirrors (DOCKER_REGISTRY, APK_MIRROR) are read from .env, see .env.example;
+#   unset or empty means Docker Hub and the Alpine CDN
+#
 #   make up                   start a stack in the background (STACK=main|bridge|test|example, default main)
 #   make down                 stop and remove the stack's containers
 #   make logs                 follow the stack's logs
@@ -18,9 +21,14 @@
 # Compose resolves `context: ${PWD}/docker` from the environment; pin it to this directory (make -C safe)
 export PWD := $(CURDIR)
 
+# Optional build mirrors, plain KEY=value lines without quotes
+-include .env
+export DOCKER_REGISTRY APK_MIRROR
+
 ARGS ?=
 BAKE := docker buildx bake --allow=network.host -f compose/docker-compose.base.yml --load $(ARGS)
-DOCKER_BUILD := docker build --network host $(ARGS)
+DOCKER_BUILD := docker build --network host \
+	--build-arg DOCKER_REGISTRY=$(DOCKER_REGISTRY) --build-arg APK_MIRROR=$(APK_MIRROR) $(ARGS)
 
 STACK ?= main
 S ?=

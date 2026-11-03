@@ -1,13 +1,18 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # BASE STAGE - Alpine + gost (HTTP & SOCKS proxy on one port)
 # ═══════════════════════════════════════════════════════════════════════════════
-FROM docker.arvancloud.ir/alpine:3.24 AS base
+# Mirrors come from .env (see .env.example); empty = Docker Hub and the Alpine CDN
+ARG DOCKER_REGISTRY=
+FROM ${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}alpine:3.24 AS base
 
+ARG APK_MIRROR=
 ENV TERM=xterm-256color
 
-# ── Mirror setup ────────────────────────────────────────────────────────────
-RUN echo "http://repo.iut.ac.ir/repo/alpine/v3.24/main" > /etc/apk/repositories && \
-    echo "http://repo.iut.ac.ir/repo/alpine/v3.24/community" >> /etc/apk/repositories
+# ── Mirror setup (only when APK_MIRROR is set, else keep the default repos) ──
+RUN if [ -n "$APK_MIRROR" ]; then \
+      v="v$(cut -d. -f1,2 /etc/alpine-release)"; \
+      printf '%s/%s/main\n%s/%s/community\n' "$APK_MIRROR" "$v" "$APK_MIRROR" "$v" > /etc/apk/repositories; \
+    fi
 
 # ── Install base system requirements ─────────────────────────────────────────
 RUN apk add --no-cache \

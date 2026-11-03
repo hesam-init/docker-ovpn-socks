@@ -2,3 +2,4 @@ logs
 **.auth
 **auth.txt
 repomix-output.md
+.env

@@ -91,7 +91,7 @@ Internet (Egress with Remote VPN Gateway IP)
 - **RFC-1918 LAN Bypass**: Local subnets (`10/8`, `172.16/12`, `192.168/16`) automatically bypass the VPN tunnel.
 - **Macvlan Support**: Assign real, dedicated LAN IPs to containers for direct access from any device on your network without host port forwarding (see [wiki/bridge.md](wiki/bridge.md)).
 - **Integrated Docker Healthchecks**: Continual verification of `tun0` interface status and outbound reachability with automated failover and restart support.
-- **Alpine 3.24 Base**: Small (~117 MB) multi-stage Alpine image with support for custom mirrors in restricted network environments.
+- **Alpine 3.24 Base**: Small (~117 MB) multi-stage Alpine image with optional registry/apk mirrors for restricted networks, set in `.env` (see `.env.example`).
 
 ---
 
@@ -108,6 +108,7 @@ Internet (Egress with Remote VPN Gateway IP)
 
 ```text
 docker-ovpn-socks/
+├── .env.example                # Optional build mirrors (copy to .env, which is gitignored)
 ├── Makefile                    # Image builds (`make` / `make build-raw`) and stack control (`make up` / `make down`)
 ├── docker-compose.yml          # Standard multi-protocol deployment (port mapping)
 ├── docker/                     # Image source (build context)
@@ -243,6 +244,14 @@ services:
 ---
 
 ### 3. Build Base Images and Start Services
+
+By default the images build from Docker Hub and the official Alpine repos. On a restricted network, copy the mirror settings first:
+
+```bash
+cp .env.example .env   # DOCKER_REGISTRY=docker.arvancloud.ir, APK_MIRROR=http://repo.iut.ac.ir/repo/alpine
+```
+
+Empty or missing values fall back to the official sources. Write plain `KEY=value` lines without quotes, because the Makefile includes the file directly.
 
 ```bash
 # Build the images (uses host networking for reliable mirror access)

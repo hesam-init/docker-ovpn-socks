@@ -10,6 +10,7 @@ Docker images that run a VPN client (OpenVPN or OpenConnect/AnyConnect) plus an 
 
 ```bash
 # Build ovpn-client:latest and openconnect-client:latest via the Makefile
+cp .env.example .env   # optional: build through the Iranian mirrors (empty/missing = official sources)
 make                   # docker buildx bake --allow=network.host -f compose/docker-compose.base.yml --load ovpn-template openconnect-template
 make build-no-cache    # same, with --no-cache
 make build-raw         # same images via plain `docker build --network host -f docker/Dockerfile --target <ovpn|openconnect> docker`
@@ -65,6 +66,6 @@ curl --proxy http://127.0.0.1:<port> ifconfig.me      # same port also speaks HT
 
 ## Constraints
 
-- **Keep the Iranian mirrors**: the base image `docker.arvancloud.ir/alpine:3.24` and the apk repos `http://repo.iut.ac.ir/repo/alpine/v3.24/{main,community}`. The target deployment has restricted network access.
+- **Build mirrors come from `.env`**: `DOCKER_REGISTRY` (prefix for `alpine:3.24`) and `APK_MIRROR` (Alpine mirror root; the Dockerfile appends `/v<version>/{main,community}`). The Makefile `-include`s `.env` and exports both; bake gets them through `build.args` in `compose/docker-compose.base.yml`, and `build-raw` gets them through `--build-arg`. Empty or unset means Docker Hub and the Alpine CDN. Keep the Iranian mirrors (`docker.arvancloud.ir`, `http://repo.iut.ac.ir/repo/alpine`) in the committed `.env.example`; the target deployment has restricted network access.
 - Containers need `cap_add: NET_ADMIN`, `/dev/net/tun`, and the sysctls `net.ipv4.ip_forward=1` and `net.ipv4.conf.all.src_valid_mark=1`. These are inherited from the base templates, so don't remove them.
-- `configs/<provider>/*.ovpn` are committed. `auth.txt` and `*.auth` files are gitignored and must stay out of git.
+- `configs/<provider>/*.ovpn` are committed. `.env`, `auth.txt` and `*.auth` files are gitignored and must stay out of git.
