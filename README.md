@@ -97,7 +97,7 @@ Internet (Egress with Remote VPN Gateway IP)
 
 ## Prerequisites
 
-- Docker Engine (v20.10+), Docker Compose (v2.0+) and Docker Buildx (used by `make`). See the host setup guides for [Arch Linux](wiki/install-arch.md) and [Debian-based distros](wiki/install-debian.md)
+- Docker Engine (v20.10+), Docker Compose (the v2 `docker compose` plugin, or legacy `docker-compose` 1.29 such as Debian 12's, which `make` falls back to) and Docker Buildx (used by `make`). See the host setup guides for [Arch Linux](wiki/install-arch.md) and [Debian-based distros](wiki/install-debian.md)
 - Host Linux kernel with `/dev/net/tun` support (standard on most distributions)
 - OpenVPN configuration files (`.ovpn`) OR OpenConnect/AnyConnect server address
 - VPN credentials (username and password)

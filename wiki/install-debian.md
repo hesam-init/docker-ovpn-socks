@@ -97,10 +97,12 @@ Here `docker-compose` and `docker-buildx` install as CLI plugins in `/usr/libexe
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y docker.io make git
+sudo apt-get install -y docker.io docker-compose make git
 ```
 
-Skip Debian 12's `docker-compose` package: it is the legacy v1 `docker-compose` tool and doesn't provide the `docker compose` command used throughout this project. Instead, install the Compose v2 plugin binary by hand. Pin a 2.x release, because newer major versions may require a newer engine than 20.10:
+Debian 12's `docker-compose` is the legacy v1 tool (1.29.2). It doesn't provide `docker compose`, but the compose files stay v1-compatible and the `make up` / `down` / `logs` / `ps` / `config` targets fall back to `docker-compose` when the plugin is missing. Outside `make`, run `docker-compose -p docker-ovpn-socks -f <file> ...` yourself.
+
+If you'd rather have Compose v2 instead, skip the `docker-compose` package and install the v2 plugin binary by hand. Pin a 2.x release, because newer major versions may require a newer engine than 20.10:
 
 ```bash
 COMPOSE_VERSION=v2.29.7
@@ -179,7 +181,7 @@ If you use the macvlan setup in [bridge.md](bridge.md), the `macvlan` module is 
 
 ```bash
 docker version
-docker compose version
+docker compose version  # or `docker-compose version` with Debian 12's v1 package
 docker buildx version   # not available on Debian 12 main-repo installs
 ```
 
@@ -209,6 +211,6 @@ make build-raw    # Debian 12/13 main-repo packages (Buildx missing or too old f
 | `Cannot connect to the Docker daemon ... Is the docker daemon running?` | Run `sudo systemctl enable --now docker.service` and check `journalctl -u docker.service -b`. |
 | `apt-get update` fails with `NO_PUBKEY` or `Signed-By` errors | The keyring path in `docker.sources` doesn't match `/etc/apt/keyrings/docker.asc`, or the key wasn't downloaded. Redo step 2 of Option A. |
 | `apt-get update` 404s on `download.docker.com` | `Suites:` is set to a derivative's codename (e.g. a Mint release name). Set it to the upstream Ubuntu/Debian codename. |
-| `docker: 'compose' is not a docker command` | Install `docker-compose-plugin` (Option A), `docker-compose-v2` (Ubuntu) or `docker-compose` (Debian 13). On Debian 12, install the Compose v2 plugin binary by hand (Option B). |
+| `docker: 'compose' is not a docker command` | Install `docker-compose-plugin` (Option A), `docker-compose-v2` (Ubuntu) or `docker-compose` (Debian 13). On Debian 12, use `make` (it falls back to `docker-compose` v1) or install the Compose v2 plugin binary by hand (Option B). |
 | `make` fails with `unknown flag: --allow` or `docker: 'buildx' is not a docker command` | Buildx is missing (Debian 12) or older than 0.18 (Debian 13's 0.13.1). Use `make build-raw`, or switch to Option A for a current `docker-buildx-plugin`. |
 | Container exits with `Cannot open TUN/TAP dev /dev/net/tun` | Load the `tun` module (step 4). |

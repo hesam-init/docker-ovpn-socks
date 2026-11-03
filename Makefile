@@ -17,6 +17,9 @@
 #   make ps                   list the stack's containers
 #   make config               validate and print the resolved compose file
 #   S=...                     limit up/logs to some services, e.g. `make logs STACK=bridge S=tci-bridge`
+#
+#   Compose: the `docker compose` v2 plugin when it exists, else legacy `docker-compose`
+#   (e.g. 1.29 on Debian 12). Force one with COMPOSE_BIN=..., e.g. `make up COMPOSE_BIN=docker-compose`
 
 # Compose resolves `context: ${PWD}/docker` from the environment; pin it to this directory (make -C safe)
 export PWD := $(CURDIR)
@@ -37,8 +40,12 @@ STACK_FILE_bridge := compose/docker-compose.bridge.yml
 STACK_FILE_test := compose/docker-compose.test.yml
 STACK_FILE_example := compose/docker-compose.example.yml
 STACK_FILE := $(STACK_FILE_$(STACK))
+# v2 plugin if present, else v1; recursive, so it is only probed when a compose target runs
+COMPOSE_BIN ?= $(shell docker compose version >/dev/null 2>&1 && echo 'docker compose' || echo docker-compose)
+# Pinned here, not with a top-level `name:` in the compose files, which Compose v1 rejects
+COMPOSE_PROJECT ?= docker-ovpn-socks
 # Lazy, so an unknown STACK only errors when a compose target runs
-COMPOSE = docker compose -f $(or $(STACK_FILE),$(error unknown STACK '$(STACK)', use main|bridge|test|example))
+COMPOSE = $(COMPOSE_BIN) -p $(COMPOSE_PROJECT) -f $(or $(STACK_FILE),$(error unknown STACK '$(STACK)', use main|bridge|test|example))
 
 .PHONY: all build build-no-cache build-raw build-raw-no-cache up down logs ps config
 

@@ -1,5 +1,3 @@
-name: docker-ovpn-socks
-
 services:
   vpnbaz-bridge:
     extends:

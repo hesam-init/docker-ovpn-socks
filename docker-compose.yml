@@ -1,5 +1,3 @@
-name: docker-ovpn-socks
-
 # vpnbaz preset: set VPN_CONFIG to a file name in configs/ovpn-vpnbaz.
 # Each service sets its own ports.
 x-vpnbaz: &vpnbaz
@@ -23,26 +21,24 @@ services:
   vpnbaz-socks:
     <<: *vpnbaz
     ports: ["1080:1080"]
-    environment: VPN_CONFIG=Smart3MTN.ovpn
+    environment: ["VPN_CONFIG=Smart3MTN.ovpn"]
 
   vpnbaz2-socks:
     <<: *vpnbaz
     ports: ["1081:1080"]
-    environment: VPN_CONFIG=Smart9MTN-nl.ovpn
+    environment: ["VPN_CONFIG=Smart9MTN-nl.ovpn"]
 
   vpnbaz3-socks:
     <<: *vpnbaz
     ports: ["1082:1080"]
-    environment: VPN_CONFIG=Smart10MTN-nl.ovpn
+    environment: ["VPN_CONFIG=Smart10MTN-nl.ovpn"]
 
   vpnbaz-openconnect-socks:
     <<: *vpnbaz-oc
     ports: ["9090:1080"]
-    environment: VPN_SERVER=mcipower1.apibaz.org:110
+    environment: ["VPN_SERVER=mcipower1.apibaz.org:110"]
 
   vpnbaz2-openconnect-socks:
     <<: *vpnbaz-oc
     ports: ["9091:1080"]
-    environment: 
-      - VPN_SERVER=shatel1.apibaz.org:110
-      - VPN_OS=android
+    environment: ["VPN_SERVER=shatel1.apibaz.org:110", "VPN_OS=android"]
