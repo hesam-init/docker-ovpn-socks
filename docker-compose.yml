@@ -38,7 +38,7 @@ services:
   vpnbaz-openconnect-socks:
     <<: *vpnbaz-oc
     ports: ["9090:1080"]
-    environment: VPN_SERVER=mcipower1.apibaz.org
+    environment: VPN_SERVER=mcipower1.apibaz.org:110
 
   vpnbaz2-openconnect-socks:
     <<: *vpnbaz-oc
