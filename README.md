@@ -97,7 +97,7 @@ Internet (Egress with Remote VPN Gateway IP)
 
 ## Prerequisites
 
-- Docker Engine (v20.10+), Docker Compose (the v2 `docker compose` plugin, or legacy `docker-compose` 1.29 such as Debian 12's, which `make` falls back to) and Docker Buildx (used by `make`). See the host setup guides for [Arch Linux](wiki/install-arch.md) and [Debian-based distros](wiki/install-debian.md)
+- Docker Engine (v20.10+), Docker Compose (the v2 `docker compose` plugin, or legacy `docker-compose` 1.29 such as Debian 12's, which `make` falls back to) and Docker Buildx (optional: `make` runs plain `docker build`, which falls back to the legacy builder without it). See the host setup guides for [Arch Linux](wiki/install-arch.md) and [Debian-based distros](wiki/install-debian.md)
 - Host Linux kernel with `/dev/net/tun` support (standard on most distributions)
 - OpenVPN configuration files (`.ovpn`) OR OpenConnect/AnyConnect server address
 - VPN credentials (username and password)
@@ -109,7 +109,7 @@ Internet (Egress with Remote VPN Gateway IP)
 ```text
 docker-ovpn-socks/
 ├── .env.example                # Optional build mirrors (copy to .env, which is gitignored)
-├── Makefile                    # Image builds (`make` / `make build-raw`) and stack control (`make up` / `make down`)
+├── Makefile                    # Image builds (`make` / `make build-no-cache`) and stack control (`make up` / `make down`)
 ├── docker-compose.yml          # Standard multi-protocol deployment (port mapping)
 ├── docker/                     # Image source (build context)
 │   ├── Dockerfile              # Multi-stage build: Alpine 3.24 base + gost, ovpn & openconnect targets
@@ -248,14 +248,14 @@ services:
 By default the images build from Docker Hub and the official Alpine repos. On a restricted network, copy the mirror settings first:
 
 ```bash
-cp .env.example .env   # DOCKER_REGISTRY=docker.arvancloud.ir, APK_MIRROR=http://repo.iut.ac.ir/repo/alpine
+cp .env.example .env   # DOCKER_REGISTRY=docker.arvancloud.ir, ALPINE_APK_MIRROR=http://mirror.arvancloud.ir/alpine
 ```
 
 Empty or missing values fall back to the official sources. Write plain `KEY=value` lines without quotes, because the Makefile includes the file directly.
 
 ```bash
 # Build the images (uses host networking for reliable mirror access)
-make               # or `make build-raw` for plain `docker build`
+make               # plain `docker build --network host`, no buildx needed
 
 # Start services in the background (docker-compose.yml)
 make up               # or plain `docker compose up -d`
@@ -286,7 +286,7 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 ```
 
 > [!NOTE]
-> `docker compose build` does not work for these templates: Compose builds through bake, which rejects `build.network: host` unless `--allow=network.host` is passed, and Compose has no way to pass it. The Makefile runs `docker buildx bake --allow=network.host -f compose/docker-compose.base.yml --load <targets>` instead.
+> `docker compose build` does not work for these templates: Compose builds through bake, which rejects `build.network: host` unless `--allow=network.host` is passed, and Compose has no way to pass it. The Makefile runs plain `docker build --network host -f docker/Dockerfile --target ovpn|openconnect docker` instead.
 
 > [!TIP]
 > Always use `socks5h://` instead of `socks5://` in `curl` so that DNS resolution happens remotely inside the container rather than leaking through your local DNS resolver.
@@ -331,11 +331,12 @@ curl --proxy socks5h://127.0.0.1:9090 ifconfig.me
 
 ## Compose Files Reference
 
-The main `docker-compose.yml` is at the repo root; the base templates and the bridge/test/example stacks are in `compose/`. The `make` targets pick a stack with `STACK=main|bridge|test|example` (default `main`) and limit `up`/`logs` to some services with `S=...`:
+The main `docker-compose.yml` is at the repo root; the base templates and the bridge/test/example stacks are in `compose/`. The `make` targets pick a stack with `STACK=main|bridge|test|example` (default `main`) and limit `up`/`restart`/`logs` to some services with `S=...`:
 
 ```bash
 make up               # docker compose -f docker-compose.yml up -d
 make down             # stop and remove the stack's containers
+make restart          # restart the stack's containers (S=... for some services)
 make logs             # follow logs
 make ps               # list containers and health
 make config           # validate and print the resolved compose file
@@ -360,11 +361,10 @@ Defines the base service definitions inherited by other compose files via `exten
 
 Build base images:
 ```bash
-make                      # ovpn-client:latest, openconnect-client:latest (via buildx bake; same as `make build`)
+make                      # ovpn-client:latest, openconnect-client:latest via `docker build --network host` (same as `make build`)
 make build-no-cache       # same, ignoring the build cache
-make build-raw            # same images with plain `docker build --network host -f docker/Dockerfile --target ovpn|openconnect docker`
-make build-raw-no-cache   # raw build, ignoring the build cache
-make ARGS=...             # extra flags are passed through
+make ARGS=...             # extra flags are passed to docker build
+make clean                # remove the ovpn-client and openconnect-client images
 ```
 
 ### 3. `compose/docker-compose.bridge.yml` — Multi-VPN with Macvlan LAN IPs

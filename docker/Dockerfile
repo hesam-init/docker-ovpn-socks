@@ -5,18 +5,17 @@
 ARG DOCKER_REGISTRY=
 FROM ${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}alpine:3.24 AS base
 
-ARG APK_MIRROR=
+ARG ALPINE_APK_MIRROR=
 ENV TERM=xterm-256color
 
-# ── Mirror setup (only when APK_MIRROR is set, else keep the default repos) ──
-RUN if [ -n "$APK_MIRROR" ]; then \
+# ── Mirror setup (only when ALPINE_APK_MIRROR is set, else keep the default repos) ──
+RUN if [ -n "$ALPINE_APK_MIRROR" ]; then \
       v="v$(cut -d. -f1,2 /etc/alpine-release)"; \
-      printf '%s/%s/main\n%s/%s/community\n' "$APK_MIRROR" "$v" "$APK_MIRROR" "$v" > /etc/apk/repositories; \
+      printf '%s/%s/main\n%s/%s/community\n' "$ALPINE_APK_MIRROR" "$v" "$ALPINE_APK_MIRROR" "$v" > /etc/apk/repositories; \
     fi
 
 # ── Install base system requirements ─────────────────────────────────────────
-RUN apk add --no-cache \
-    bash ca-certificates tzdata curl \
+RUN apk add bash ca-certificates tzdata curl \
     gost openvpn openconnect vpnc \
     iptables iproute2
 

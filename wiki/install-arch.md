@@ -14,11 +14,11 @@ sudo pacman -Syu --needed docker docker-compose docker-buildx make git
 | ---------------- | -------------------------------------------------------------------------------- |
 | `docker`         | Docker Engine (`dockerd`), the `docker` CLI and containerd                        |
 | `docker-compose` | Compose v2, installed as the `docker compose` CLI plugin                          |
-| `docker-buildx`  | Buildx. `make` runs `docker buildx bake --allow=network.host ...` to build images |
+| `docker-buildx`  | Buildx (BuildKit). Optional: `make` runs plain `docker build`, which uses it when present |
 | `make`, `git`    | Clone the repo and run the `Makefile` targets                                    |
 
 > [!NOTE]
-> Without `docker-buildx`, Docker falls back to the legacy builder and `make` fails. `make build-raw` (plain `docker build`) still works, but the default build path needs Buildx.
+> Without `docker-buildx`, `docker build` falls back to the legacy builder and prints a deprecation warning. `make` still builds the images.
 
 ---
 
@@ -120,5 +120,4 @@ make
 | `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock` | Your session predates the group change. Log out and back in, or run `newgrp docker`. |
 | `Cannot connect to the Docker daemon ... Is the docker daemon running?` | Run `sudo systemctl enable --now docker.service` and check `journalctl -u docker.service -b`. |
 | `docker: 'compose' is not a docker command` | Install `docker-compose` (it provides the CLI plugin in `/usr/lib/docker/cli-plugins/`). |
-| `make` fails with `unknown flag: --allow` or `docker: 'buildx' is not a docker command` | Buildx is missing or too old. Install or update `docker-buildx`, or use `make build-raw`. |
 | Container exits with `Cannot open TUN/TAP dev /dev/net/tun` | Load the `tun` module (step 4). |
